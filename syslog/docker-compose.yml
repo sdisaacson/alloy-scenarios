@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Rsyslog service
+  rsyslog:
+    image: rsyslog/syslog_appliance_alpine:latest
+    container_name: rsyslog
+    ports:
+      - "514:514/udp"     # Standard syslog UDP port
+      - "514:514/tcp"     # Standard syslog TCP port (if needed)
+    volumes:
+      - ./rsyslog.conf:/etc/rsyslog.conf    # Custom rsyslog configuration
+      - rsyslog_data:/var/log               # Persistent storage for logs
+
+  # Syslog simulator using a Python script
+  syslog-simulator:
+    image: python:3.9-slim
+    container_name: syslog-simulator
+    volumes:
+      - ./syslog_simulator.py:/syslog_simulator.py  # Syslog simulator script
+    environment:
+      - SYSLOG_HOST=rsyslog
+      - SYSLOG_PORT=514
+    depends_on:
+      - rsyslog
+    command: ["python3", "/syslog_simulator.py"]
+  
+
+  alloy:
+    image: grafana/alloy:latest
+    ports:
+      - 12345:12345
+      - 4318:4318
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy
+      - ./logs:/tmp/app-logs/
+    command: run --server.http.listen-addr=0.0.0.0:12345 --stability.level=experimental  --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    depends_on:
+      - loki
+
+  loki:
+    image: grafana/loki:3.2.0
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_BASIC_ENABLED=false
+      - GF_FEATURE_TOGGLES_ENABLE=accessControlOnCall
+      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
+    ports:
+      - 3000:3000/tcp
+volumes:
+  rsyslog_data:
