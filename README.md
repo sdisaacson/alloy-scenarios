@@ -9,8 +9,9 @@ This repository contains scenarios that demonstrate how to use Grafana Alloy to 
 
 | Scenario | Description |
 | -------- | ------------ |
-| [Docker Monitoring](docker-monitoring/README.md) | Monitor Docker containers using Grafana Alloy. |
-| [Syslog](syslog/README.md) | Monitor non RFC5424 compliant syslog messages using rsyslog and Alloy. |
+| [Docker Monitoring](docker-monitoring/) | Monitor Docker containers using Grafana Alloy. |
+| [Syslog](syslog/) | Monitor non RFC5424 compliant syslog messages using rsyslog and Alloy. |
+| [Logs Over TCP](logs-tcp/) | Send TCP logs to Alloy within a JSON format. |
 
 ## Contributing
 
