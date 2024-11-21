@@ -12,6 +12,7 @@ This repository contains scenarios that demonstrate how to use Grafana Alloy to 
 | [Docker Monitoring](docker-monitoring/) | Monitor Docker containers using Grafana Alloy. |
 | [Syslog](syslog/) | Monitor non RFC5424 compliant syslog messages using rsyslog and Alloy. |
 | [Logs Over TCP](logs-tcp/) | Send TCP logs to Alloy within a JSON format. |
+| [Mail House](mail-house/) | Learn how to parse structured logs into Labels and Structured Metadata |
 
 ## Contributing
 

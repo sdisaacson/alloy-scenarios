@@ -1,0 +1,50 @@
+
+
+livedebugging {
+  enabled = true
+}
+
+loki.source.api "loki_push_api" {
+    http {
+        listen_address = "0.0.0.0"
+        listen_port = 9999
+    }
+    forward_to = [
+        loki.process.lables.receiver,
+    ]
+}
+
+loki.process "lables" {
+    stage.json {
+      expressions = { "extracted_state" = "state", 
+                      "extracted_package_size" = "package_size", 
+                      "extracted_package_status" = "package_status", 
+                      "extracted_package_id" = "package_id",
+                    }
+    }
+
+  stage.labels {
+    values = {
+      "service_name" = "Post World",
+      "state" = "extracted_state",
+      "package_size" = "extracted_package_size",
+    }
+  }
+
+  stage.structured_metadata {
+    values = {
+      "package_status" = "extracted_package_status",
+      "package_id" = "extracted_package_id",
+    }
+  
+}
+
+forward_to = [loki.write.local.receiver]
+
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
