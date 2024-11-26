@@ -69,7 +69,8 @@ def main():
         sock.connect((target_host, target_port))
     except socket.error as e:
         print(f"Failed to connect to {target_host}:{target_port} - {e}")
-        exit(1)
+        time.sleep(1)
+        main()
     
     while True:
         try:
