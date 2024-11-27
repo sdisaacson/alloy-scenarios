@@ -42,7 +42,7 @@ def generate_log_entry():
     city = random.choice(STATES_CITIES[state])
     
     log_entry = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
         "state": state,
         "city": city,
         "package_id": f"PKG{random.randint(10000, 99999)}",
