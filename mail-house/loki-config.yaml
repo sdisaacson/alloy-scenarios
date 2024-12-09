@@ -38,3 +38,9 @@ storage_config:
 
 pattern_ingester:
   enabled: true
+
+# Note: We are setting the max chunk age far lower than the default expected value
+# This is due to the fact this scenario is used within the LogCLI demo and we need a short flush time.
+# To show how logcli stats --since 24h '{service_name="Delivery World", package_size="Large"}' works.
+ingester:
+  max_chunk_age: 5m # Should be 2 hours
