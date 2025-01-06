@@ -1,35 +1,26 @@
 version: '3.8'
 
 services:
-  # Syslog simulator using a Python script
-  mail-house:
-    image: python:3.11-slim
-    container_name: mail-house
-    volumes:
-      - ./main.py:/main.py  # Syslog simulator script
-    depends_on:
-      - alloy
-    command: ["python3", "/main.py"]
-  
-
-  alloy:
-    image: grafana/alloy:latest
-    ports:
-      - 12345:12345
-      - 4318:4318
-    volumes:
-      - ./config.alloy:/etc/alloy/config.alloy
-    command: run --server.http.listen-addr=0.0.0.0:12345 --stability.level=experimental  --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
-    depends_on:
-      - loki
 
   loki:
-    image: grafana/loki:3.2.0
+    image: grafana/loki:3.3.0
     ports:
-      - "3100:3100"
+      - 3100:3100/tcp
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
+
+
+  prometheus:
+     image: prom/prometheus:v3.1.0
+     command:
+       - --web.enable-remote-write-receiver
+       - --config.file=/etc/prometheus/prometheus.yml
+     ports:
+      - 9090:9090/tcp
+     volumes:
+        - ./prom-config.yaml:/etc/prometheus/prometheus.yml
+
 
   grafana:
     image: grafana/grafana:latest
@@ -58,5 +49,14 @@ services:
            isDefault: false
            version: 1
            editable: false
+         - name: Prometheus
+           type: prometheus
+           orgId: 1
+           url: http://prometheus:9090
+           basicAuth: false
+           isDefault: true
+           version: 1
+           editable: false
          EOF
          /run.sh
+

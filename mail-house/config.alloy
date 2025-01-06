@@ -49,6 +49,10 @@ loki.process "lables" {
       "service_name" = "Delivery World",
     }
   }
+
+  stage.output {
+    source = "message"
+}
   
 
 
