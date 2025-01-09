@@ -14,6 +14,8 @@ This repository contains scenarios that demonstrate how to use Grafana Alloy to 
 | [Logs Over TCP](logs-tcp/) | Send TCP logs to Alloy within a JSON format. |
 | [Mail House](mail-house/) | Learn how to parse structured logs into Labels and Structured Metadata |
 | [Monitor Windows](windows/) | Learn how to use Grafana Alloy to monitor system metrics and Event Logs|
+| [Kubernetes Logs](k8s-logs/) | Monitor Kubernetes logs using Grafana Alloy and Loki. |
+
 ## Contributing
 
 If you have a scenario you would like to contribute, please open a pull request with the following changes:
