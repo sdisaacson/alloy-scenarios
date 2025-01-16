@@ -1,0 +1,43 @@
+---
+cluster:
+  name: meta-monitoring-tutorial
+
+destinations:
+  - name: loki
+    type: loki
+    url: http://loki-gateway.meta.svc.cluster.local/loki/api/v1/push
+
+
+clusterEvents:
+  enabled: true
+  collector: alloy-logs
+  namespaces:
+    - meta
+    - prod
+
+nodeLogs:
+  enabled: false
+
+podLogs:
+  enabled: true
+  gatherMethod: kubernetesApi
+  collector: alloy-logs
+  namespaces:
+    - meta
+    - prod
+
+# Collectors
+alloy-singleton:
+  enabled: false
+
+alloy-metrics:
+  enabled: false
+
+alloy-logs:
+  enabled: true
+
+alloy-profiles:
+  enabled: false
+
+alloy-receiver:
+  enabled: false
