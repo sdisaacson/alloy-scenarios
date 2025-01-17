@@ -14,6 +14,10 @@ adminPassword: adminadminadmin
 #  userKey: admin-user
 #  passwordKey: admin-password
 
+service:
+  enabled: true
+  type: ClusterIP
+
 datasources:
   datasources.yaml:
         apiVersion: 1
