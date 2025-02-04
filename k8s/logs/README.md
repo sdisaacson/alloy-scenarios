@@ -1,7 +1,7 @@
 
 # Monitor Kubernetes Logs with Grafana Alloy and Loki
 
-> Note this scenario works using the K8s Monitoring Helm chart. This abstracts the need to configure Loki and deploys best practices for monitoring Kubernetes clusters. The chart supports; metrics, logs, profiling, and tracing. For this scenario, we will use the K8s Monitoring Helm chart to monitor Kubernetes logs. 
+> Note this scenario works using the K8s Monitoring Helm chart. This abstracts the need to configure Alloy and deploys best practices for monitoring Kubernetes clusters. The chart supports; metrics, logs, profiling, and tracing. For this scenario, we will use the K8s Monitoring Helm chart to monitor Kubernetes logs. 
 
 This scenario demonstrates how to setup the Kubernetes monitoring helm and Loki. This scenario will install three Helm charts: Loki, Grafana, and k8s-monitoring-helm. Loki will be used to store the logs, Grafana will be used to visualize the logs, and Alloy (k8s-monitoring-helm) will be used to collect three different log sources:
 * Pod Logs
