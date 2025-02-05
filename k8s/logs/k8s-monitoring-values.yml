@@ -28,7 +28,7 @@ podLogs:
   namespaces:
     - meta
     - prod
-    
+
 # Collectors
 alloy-singleton:
   enabled: false
@@ -38,6 +38,9 @@ alloy-metrics:
 
 alloy-logs:
   enabled: true
+  alloy:
+    mounts:
+      varlog: false
 
 alloy-profiles:
   enabled: false
