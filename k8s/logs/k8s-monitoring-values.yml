@@ -41,6 +41,8 @@ alloy-logs:
   alloy:
     mounts:
       varlog: false
+    clustering:
+      enabled: true
 
 alloy-profiles:
   enabled: false
