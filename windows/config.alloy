@@ -84,3 +84,4 @@ loki.write "endpoint" {
     }
 }
 
+livedebugging{}
