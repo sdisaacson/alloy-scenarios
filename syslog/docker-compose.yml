@@ -10,7 +10,8 @@ services:
       - "514:514/tcp"     # Standard syslog TCP port (if needed)
     volumes:
       - ./rsyslog.conf:/etc/rsyslog.conf    # Custom rsyslog configuration
-      - rsyslog_data:/var/log               # Persistent storage for logs
+    depends_on:
+      - alloy
 
   # Syslog simulator using a Python script
   syslog-simulator:
@@ -30,7 +31,8 @@ services:
     image: grafana/alloy:latest
     ports:
       - 12345:12345
-      - 4318:4318
+      - 51893:51893
+      - 51898:51898
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy
       - ./logs:/tmp/app-logs/
@@ -39,7 +41,7 @@ services:
       - loki
 
   loki:
-    image: grafana/loki:3.2.0
+    image: grafana/loki:3.4.1
     ports:
       - "3100:3100"
     volumes:
@@ -53,7 +55,6 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_BASIC_ENABLED=false
       - GF_FEATURE_TOGGLES_ENABLE=accessControlOnCall
-      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-lokiexplore-app/grafana-lokiexplore-app-latest.zip;grafana-lokiexplore-app
     ports:
       - 3000:3000/tcp
     entrypoint:
