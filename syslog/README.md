@@ -1,6 +1,6 @@
 # Syslog Scenario
 
-This scenario demonstrates how to use ryslog and Alloy to monitor non RFC5424 compliant syslog messages.
+This scenario demonstrates how to use ryslog and Alloy to monitor non RFC5424 compliant syslog messages. Alloy by itself does not support non RFC5424 compliant syslog messages. However, we can use rsyslog to convert non RFC5424 compliant syslog messages to RFC5424 compliant syslog messages. 
 
 ## Running the Demo
 
