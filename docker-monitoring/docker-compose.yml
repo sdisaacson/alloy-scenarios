@@ -59,6 +59,5 @@
       - 4318:4318
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy
-      - ./logs:/tmp/app-logs/
       - /var/run/docker.sock:/var/run/docker.sock
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy

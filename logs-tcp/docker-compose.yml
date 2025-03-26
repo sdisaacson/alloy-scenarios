@@ -27,7 +27,7 @@ services:
       - loki
 
   loki:
-    image: grafana/loki:3.2.0
+    image: grafana/loki:3.4.2
     ports:
       - "3100:3100"
     volumes:
