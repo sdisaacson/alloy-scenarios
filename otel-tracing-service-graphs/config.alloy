@@ -25,7 +25,13 @@ otelcol.processor.batch "default" {
 // Service Graph Generator 
 otelcol.connector.servicegraph "default" {
   metrics_flush_interval = "10s"
-  dimensions = ["http.method"]
+  dimensions = ["service.name"]
+  
+  // Configure the span store for better pairing
+  store {
+    max_items = 5000
+    ttl = "30s"
+  }
   
   output {
     metrics = [otelcol.exporter.otlphttp.prometheus.input]
@@ -51,3 +57,7 @@ otelcol.exporter.otlp "tempo" {
     }
   }
 } 
+
+livedebugging {
+  enabled = true
+}

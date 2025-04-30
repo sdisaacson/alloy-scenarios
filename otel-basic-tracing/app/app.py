@@ -45,6 +45,7 @@ def home():
         <li><a href="/nested">Nested Trace</a></li>
         <li><a href="/error">Error Trace</a></li>
         <li><a href="/chain">Chain of Services</a></li>
+        <li><a href="/delayed-chain">Delayed Chain (with Service D having high latency)</a></li>
     </ul>
     """
 
@@ -134,6 +135,99 @@ def service_c():
             return {"status": "error", "message": "Service C failed randomly"}
         
         return {"status": "ok", "message": "Service C completed successfully"}
+
+# New delayed chain implementation
+@app.route('/delayed-chain')
+def delayed_chain_trace():
+    with tracer.start_as_current_span("delayed-chain-root") as span:
+        span.set_attribute("operation.step", "start")
+        span.set_attribute("operation.type", "delayed-chain")
+        
+        try:
+            # Start the chain with Service A
+            service_a_url = f"http://localhost:8080/delayed/service-a?id={random.randint(1000, 9999)}"
+            response = requests.get(service_a_url)
+            return {
+                "status": "ok", 
+                "message": "Delayed chain trace generated", 
+                "data": response.json()
+            }
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(trace.StatusCode.ERROR, str(e))
+            return {"status": "error", "message": "Failed to complete delayed chain"}
+
+@app.route('/delayed/service-a')
+def delayed_service_a():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-a-handler") as span:
+        span.set_attribute("service", "A")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        time.sleep(0.1)  # Normal latency
+        
+        # Call service B
+        service_b_url = f"http://localhost:8080/delayed/service-b?id={req_id}"
+        response = requests.get(service_b_url)
+        return {"status": "ok", "message": "Service A completed", "data": response.json()}
+
+@app.route('/delayed/service-b')
+def delayed_service_b():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-b-handler") as span:
+        span.set_attribute("service", "B")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        time.sleep(0.15)  # Normal latency
+        
+        # Call service C
+        service_c_url = f"http://localhost:8080/delayed/service-c?id={req_id}"
+        response = requests.get(service_c_url)
+        return {"status": "ok", "message": "Service B completed", "data": response.json()}
+
+@app.route('/delayed/service-c')
+def delayed_service_c():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-c-handler") as span:
+        span.set_attribute("service", "C")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        time.sleep(0.2)  # Normal latency
+        
+        # Call the slow service D
+        service_d_url = f"http://localhost:8080/delayed/service-d?id={req_id}"
+        response = requests.get(service_d_url)
+        return {"status": "ok", "message": "Service C completed", "data": response.json()}
+
+@app.route('/delayed/service-d')
+def delayed_service_d():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-d-handler") as span:
+        span.set_attribute("service", "D")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "high")
+        span.set_attribute("latency.category", "bottleneck")
+        
+        # This service consistently has high latency (3-4 seconds)
+        delay = random.uniform(3.0, 4.0)
+        span.set_attribute("latency.seconds", delay)
+        time.sleep(delay)  # High latency
+        
+        # Call final service E
+        service_e_url = f"http://localhost:8080/delayed/service-e?id={req_id}"
+        response = requests.get(service_e_url)
+        return {"status": "ok", "message": "Service D completed (with delay)", "data": response.json()}
+
+@app.route('/delayed/service-e')
+def delayed_service_e():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-e-handler") as span:
+        span.set_attribute("service", "E")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        time.sleep(0.1)  # Normal latency
+        
+        return {"status": "ok", "message": "Service E completed (chain end)"}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080) 

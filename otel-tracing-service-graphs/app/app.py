@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import uuid
 from flask import Flask, request
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
@@ -38,13 +39,15 @@ RequestsInstrumentor().instrument()
 @app.route('/')
 def home():
     return """
-    <h1>OpenTelemetry Demo</h1>
-    <p>This app demonstrates OpenTelemetry tracing with Grafana Alloy.</p>
+    <h1>OpenTelemetry Service Graph Demo</h1>
+    <p>This app demonstrates OpenTelemetry tracing with Grafana Alloy and service graph generation.</p>
     <ul>
         <li><a href="/simple">Simple Trace</a></li>
         <li><a href="/nested">Nested Trace</a></li>
         <li><a href="/error">Error Trace</a></li>
         <li><a href="/chain">Chain of Services</a></li>
+        <li><a href="/delayed-chain">Delayed Chain (with Service D having high latency)</a></li>
+        <li><a href="/multi-service">Multi-Service Trace (with different service.name values)</a></li>
     </ul>
     """
 
@@ -134,6 +137,224 @@ def service_c():
             return {"status": "error", "message": "Service C failed randomly"}
         
         return {"status": "ok", "message": "Service C completed successfully"}
+
+# New delayed chain implementation
+@app.route('/delayed-chain')
+def delayed_chain_trace():
+    with tracer.start_as_current_span("delayed-chain-root") as span:
+        span.set_attribute("operation.step", "start")
+        span.set_attribute("operation.type", "delayed-chain")
+        
+        try:
+            # Start the chain with Service A
+            service_a_url = f"http://localhost:8080/delayed/service-a?id={random.randint(1000, 9999)}"
+            response = requests.get(service_a_url)
+            return {
+                "status": "ok", 
+                "message": "Delayed chain trace generated", 
+                "data": response.json()
+            }
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(trace.StatusCode.ERROR, str(e))
+            return {"status": "error", "message": "Failed to complete delayed chain"}
+
+@app.route('/delayed/service-a')
+def delayed_service_a():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-a-handler") as span:
+        span.set_attribute("service", "A")
+        span.set_attribute("client.service.name", "frontend")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        span.set_attribute("http.method", "GET")
+        time.sleep(0.1)  # Normal latency
+        
+        # Call service B
+        service_b_url = f"http://localhost:8080/delayed/service-b?id={req_id}"
+        response = requests.get(service_b_url)
+        return {"status": "ok", "message": "Service A completed", "data": response.json()}
+
+@app.route('/delayed/service-b')
+def delayed_service_b():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-b-handler") as span:
+        span.set_attribute("service", "B")
+        span.set_attribute("client.service.name", "service-a")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        span.set_attribute("http.method", "GET")
+        time.sleep(0.15)  # Normal latency
+        
+        # Call service C
+        service_c_url = f"http://localhost:8080/delayed/service-c?id={req_id}"
+        response = requests.get(service_c_url)
+        return {"status": "ok", "message": "Service B completed", "data": response.json()}
+
+@app.route('/delayed/service-c')
+def delayed_service_c():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-c-handler") as span:
+        span.set_attribute("service", "C")
+        span.set_attribute("client.service.name", "service-b")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        span.set_attribute("http.method", "GET")
+        time.sleep(0.2)  # Normal latency
+        
+        # Call the slow service D
+        service_d_url = f"http://localhost:8080/delayed/service-d?id={req_id}"
+        response = requests.get(service_d_url)
+        return {"status": "ok", "message": "Service C completed", "data": response.json()}
+
+@app.route('/delayed/service-d')
+def delayed_service_d():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-d-handler") as span:
+        span.set_attribute("service", "D")
+        span.set_attribute("client.service.name", "service-c")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "high")
+        span.set_attribute("latency.category", "bottleneck")
+        span.set_attribute("http.method", "GET")
+        
+        # This service consistently has high latency (3-4 seconds)
+        delay = random.uniform(3.0, 4.0)
+        span.set_attribute("latency.seconds", delay)
+        time.sleep(delay)  # High latency
+        
+        # Call final service E
+        service_e_url = f"http://localhost:8080/delayed/service-e?id={req_id}"
+        response = requests.get(service_e_url)
+        return {"status": "ok", "message": "Service D completed (with delay)", "data": response.json()}
+
+@app.route('/delayed/service-e')
+def delayed_service_e():
+    req_id = request.args.get('id', 'unknown')
+    with tracer.start_as_current_span("service-e-handler") as span:
+        span.set_attribute("service", "E")
+        span.set_attribute("client.service.name", "service-d")
+        span.set_attribute("request.id", req_id)
+        span.set_attribute("service.latency", "normal")
+        span.set_attribute("http.method", "GET")
+        time.sleep(0.1)  # Normal latency
+        
+        return {"status": "ok", "message": "Service E completed (chain end)"}
+
+@app.route('/multi-service')
+def multi_service_trace():
+    transaction_id = generate_multi_service_trace()
+    return {
+        "status": "ok", 
+        "message": "Multi-service trace generated", 
+        "transaction_id": transaction_id,
+        "services": ["web-ui", "api-gateway", "auth-service", "user-service", "notification-service", "db-service"]
+    }
+
+def generate_multi_service_trace():
+    """Generate a trace that spans multiple services with true service.name differentiation"""
+    try:
+        # Create a unique transaction ID for correlating spans
+        transaction_id = str(uuid.uuid4())[:8]
+        
+        # Simulate a microservice architecture with:
+        # 1. Frontend service (web-ui)
+        # 2. API Gateway (api-gateway)
+        # 3. Authentication service (auth-service)
+        # 4. User service (user-service)
+        # 5. Notification service (notification-service)
+        # 6. Database service (db-service)
+        
+        # Create a custom resource for each service
+        web_ui_resource = Resource.create(attributes={SERVICE_NAME: "web-ui"})
+        api_gw_resource = Resource.create(attributes={SERVICE_NAME: "api-gateway"})
+        auth_resource = Resource.create(attributes={SERVICE_NAME: "auth-service"})
+        user_resource = Resource.create(attributes={SERVICE_NAME: "user-service"})
+        notif_resource = Resource.create(attributes={SERVICE_NAME: "notification-service"})
+        db_resource = Resource.create(attributes={SERVICE_NAME: "db-service"})
+        
+        # Create trace providers with each resource
+        web_ui_provider = TracerProvider(resource=web_ui_resource)
+        api_gw_provider = TracerProvider(resource=api_gw_resource)
+        auth_provider = TracerProvider(resource=auth_resource)
+        user_provider = TracerProvider(resource=user_resource)
+        notif_provider = TracerProvider(resource=notif_resource)
+        db_provider = TracerProvider(resource=db_resource)
+        
+        # Connect the providers to the same OTLP exporter via span processors
+        web_ui_provider.add_span_processor(span_processor)
+        api_gw_provider.add_span_processor(span_processor)
+        auth_provider.add_span_processor(span_processor)
+        user_provider.add_span_processor(span_processor)
+        notif_provider.add_span_processor(span_processor)
+        db_provider.add_span_processor(span_processor)
+        
+        # Create tracers for each service using their respective providers
+        web_ui_tracer = web_ui_provider.get_tracer("web-ui-tracer")
+        api_gw_tracer = api_gw_provider.get_tracer("api-gw-tracer")
+        auth_tracer = auth_provider.get_tracer("auth-tracer")
+        user_tracer = user_provider.get_tracer("user-tracer")
+        notif_tracer = notif_provider.get_tracer("notif-tracer")
+        db_tracer = db_provider.get_tracer("db-tracer")
+        
+        # 1. Frontend service (web-ui) - User logs in
+        with web_ui_tracer.start_as_current_span("login-page-render") as web_span:
+            web_span.set_attribute("component", "web-ui")
+            web_span.set_attribute("transaction.id", transaction_id)
+            web_span.set_attribute("user.action", "login")
+            web_span.set_attribute("http.method", "GET")
+            web_span.set_attribute("http.url", "/login")
+            time.sleep(0.1)
+            
+            # 2. Send login request to API Gateway
+            with api_gw_tracer.start_as_current_span("api-gateway-login-handler") as api_span:
+                api_span.set_attribute("component", "api-gateway")
+                api_span.set_attribute("transaction.id", transaction_id)
+                api_span.set_attribute("endpoint", "/api/v1/login")
+                api_span.set_attribute("http.method", "POST")
+                time.sleep(0.15)
+                
+                # 3. API Gateway calls Authentication Service
+                with auth_tracer.start_as_current_span("authenticate-user") as auth_span:
+                    auth_span.set_attribute("component", "auth-service")
+                    auth_span.set_attribute("transaction.id", transaction_id)
+                    auth_span.set_attribute("auth.method", "password")
+                    time.sleep(0.2)
+                    
+                    # 4. Auth service calls User Service to retrieve user details
+                    with user_tracer.start_as_current_span("get-user-details") as user_span:
+                        user_span.set_attribute("component", "user-service")
+                        user_span.set_attribute("transaction.id", transaction_id)
+                        user_span.set_attribute("user.id", f"user_{random.randint(1000, 9999)}")
+                        
+                        # 5. User service calls DB Service
+                        with db_tracer.start_as_current_span("db-query") as db_span:
+                            db_span.set_attribute("component", "db-service")
+                            db_span.set_attribute("transaction.id", transaction_id)
+                            db_span.set_attribute("db.operation", "SELECT")
+                            db_span.set_attribute("db.table", "users")
+                            
+                            # Randomly introduce database latency
+                            if random.random() < 0.3:
+                                delay = random.uniform(0.5, 1.5)
+                                db_span.set_attribute("db.latency", delay)
+                                db_span.set_attribute("latency.category", "slow-query")
+                                time.sleep(delay)
+                            else:
+                                time.sleep(0.1)
+                
+                # 6. After successful login, send notification
+                with notif_tracer.start_as_current_span("send-login-notification") as notif_span:
+                    notif_span.set_attribute("component", "notification-service")
+                    notif_span.set_attribute("transaction.id", transaction_id)
+                    notif_span.set_attribute("notification.type", "login_alert")
+                    notif_span.set_attribute("notification.channel", random.choice(["email", "sms", "push"]))
+                    time.sleep(0.15)
+        
+        return transaction_id
+    except Exception as e:
+        print(f"Error generating multi-service trace: {e}")
+        return None
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080) 
