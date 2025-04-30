@@ -23,7 +23,7 @@ The centralized approach allows you to manage all Docker image versions in a sin
 | [Logs Over TCP](logs-tcp/) | Send TCP logs to Alloy within a JSON format. |
 | [Mail House](mail-house/) | Learn how to parse structured logs into Labels and Structured Metadata |
 | [Monitor Windows](windows/) | Learn how to use Grafana Alloy to monitor system metrics and Event Logs|
-| [Monitor Linux](Linux/) | Learn how to use Grafana Alloy to monitor a Linux Server|
+| [Monitor Linux](linux/) | Learn how to use Grafana Alloy to monitor a Linux Server|
 | [Kubernetes](k8s/) | A series of scenarios that demonstrate how to setup Alloy via the Kubernetes monitoring helm chart. Examples specific to each telemetry source are provided in the respective directories. |
 | [Logs from File](logs-file/) | Monitor logs from a file using Grafana Alloy. |
 | [OpenTelemetry Basic Tracing](otel-basic-tracing/) | Collect and visualize OpenTelemetry traces using Grafana Alloy and Tempo. |
