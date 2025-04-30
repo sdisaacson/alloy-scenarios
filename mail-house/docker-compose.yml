@@ -1,19 +1,41 @@
 version: '3.8'
 
 services:
-  # Syslog simulator using a Python script
-  mail-house:
-    image: python:3.11-slim
-    container_name: mail-house
+  mail-house-01:
+    image: python:${PYTHON_VERSION:-3.11-slim}
     volumes:
-      - ./main.py:/main.py  # Syslog simulator script
+      - ./main.py:/main.py
     depends_on:
       - alloy
     command: ["python3", "/main.py"]
+    environment:
+      - MAIL_HOUSE_ID=DEPOT-01
+    restart: unless-stopped
   
+  mail-house-02:
+    image: python:${PYTHON_VERSION:-3.11-slim}
+    volumes:
+      - ./main.py:/main.py
+    depends_on:
+      - alloy
+    command: ["python3", "/main.py"]
+    environment:
+      - MAIL_HOUSE_ID=DEPOT-02
+    restart: unless-stopped
+    
+  mail-house-03:
+    image: python:${PYTHON_VERSION:-3.11-slim}
+    volumes:
+      - ./main.py:/main.py
+    depends_on:
+      - alloy
+    command: ["python3", "/main.py"]
+    environment:
+      - MAIL_HOUSE_ID=DEPOT-03
+    restart: unless-stopped
 
   alloy:
-    image: grafana/alloy:latest
+    image: grafana/alloy:${GRAFANA_ALLOY_VERSION:-v1.8.2}
     ports:
       - 12345:12345
       - 4318:4318
@@ -24,7 +46,7 @@ services:
       - loki
 
   loki:
-    image: grafana/loki:3.3.0
+    image: grafana/loki:${GRAFANA_LOKI_VERSION:-3.5.0}
     ports:
       - "3100:3100"
     volumes:
@@ -32,7 +54,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
 
   grafana:
-    image: grafana/grafana:11.6.0
+    image: grafana/grafana:${GRAFANA_VERSION:-11.6.1}
     environment:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_ANONYMOUS_ENABLED=true

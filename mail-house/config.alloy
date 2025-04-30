@@ -22,6 +22,7 @@ loki.process "labels" {
                       "package_size" = "", 
                       "package_status" = "", 
                       "package_id" = "",
+                      "mail_house_id" = "",
                     }
     }
 
@@ -34,6 +35,7 @@ loki.process "labels" {
     values = {
       "state" = "",
       "package_size" = "",
+      "mail_house_id" = "",
     }
   }
 

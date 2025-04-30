@@ -9,6 +9,8 @@ import os
 # Get the target host and port from environment variables
 target_host = os.getenv('TARGET_HOST', 'alloy')
 target_port = int(os.getenv('TARGET_PORT', 9999))
+# Get the mail house ID from environment variables
+mail_house_id = os.getenv('MAIL_HOUSE_ID', 'MAIL-01')
 
 # Define the endpoint path
 endpoint_path = "/loki/api/v1/raw"
@@ -58,6 +60,7 @@ def generate_log_entry():
             "name": f"Receiver{random.randint(1, 100)}",
             "address": f"{random.randint(100, 999)} {random.choice(['Oak St', 'Pine Rd', 'Cedar Blvd', 'Willow Ln'])}, {random.choice(STATES_CITIES[state])}, {state}",
         },
+        "mail_house_id": mail_house_id, 
     }
     return log_entry
 
