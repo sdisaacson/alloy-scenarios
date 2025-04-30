@@ -42,6 +42,9 @@ services:
     image: prom/prometheus:${PROMETHEUS_VERSION:-v3.3.0}
     command:
       - --web.enable-remote-write-receiver
+      - --web.enable-otlp-receiver
+      - --enable-feature=native-histograms
+      - --enable-feature=exemplar-storage
       - --config.file=/etc/prometheus/prometheus.yml
     ports:
       - 9090:9090/tcp
@@ -60,7 +63,7 @@ services:
 
   # Tempo initialization (required for file permissions)
   tempo-init:
-    image: &tempoImage grafana/tempo:${TEMPO_VERSION:-2.3.1}
+    image: &tempoImage grafana/tempo:${GRAFANA_TEMPO_VERSION:-2.7.2}
     user: root
     entrypoint:
       - "chown"
@@ -83,11 +86,12 @@ services:
       - 6832:6832/udp    # jaeger thrift binary
       - 9411:9411/tcp    # zipkin
     volumes:
-      - ./tempo.yaml:/etc/tempo.yaml
+      - ./tempo-config.yaml:/etc/tempo.yaml
       - ./tempo-data:/var/tempo
     depends_on:
       - tempo-init
       - memcached
+      - prometheus
 
   # Grafana for visualization
   grafana:
@@ -96,6 +100,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_BASIC_ENABLED=false
+      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-exploretraces-app/grafana-exploretraces-app-latest.zip;grafana-traces-app
     ports:
       - 3000:3000/tcp
     entrypoint:
@@ -132,8 +137,16 @@ services:
           isDefault: false
           version: 1
           editable: false
+          jsonData:
+            serviceMap:
+              datasourceUid: 'Prometheus'
+            nodeGraph:
+              enabled: true
         EOF
         /run.sh
+    depends_on:
+      - prometheus
+      - tempo
 
   # Alloy for telemetry pipeline
   alloy:
@@ -207,16 +220,35 @@ scrape_configs:
   - job_name: 'alloy'
     static_configs:
       - targets: ['alloy:12345']
+
+otlp:
+  # Recommended attributes to be promoted to labels.
+  promote_resource_attributes:
+    - service.instance.id
+    - service.name
+    - service.namespace
+    - service.version
+    - cloud.availability_zone
+    - cloud.region
+    - container.name
+    - deployment.environment
+    - deployment.environment.name
+    - k8s.cluster.name
+    - k8s.container.name
+    - k8s.namespace.name
+    - k8s.pod.name
+
+storage:
+  tsdb:
+    out_of_order_time_window: 30m
 ```
 
-### Tempo Configuration (tempo.yaml)
+### Tempo Configuration (tempo-config.yaml)
 
 ```yaml
-stream_over_http_enabled: true
 server:
   http_listen_port: 3200
   log_level: info
-
 
 cache:
   background:
@@ -243,11 +275,11 @@ query_frontend:
     throughput_bytes_slo: 1.073741824e+09
 
 distributor:
-  receivers:                           # this configuration will listen on all ports and protocols that tempo is capable of.
-    jaeger:                            # the receives all come from the OpenTelemetry collector.  more configuration information can
-      protocols:                       # be found there: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver
-        thrift_http:                   #
-          endpoint: "tempo:14268"      # for a production deployment you should only enable the receivers you need!
+  receivers:                           
+    jaeger:                            
+      protocols:                       
+        thrift_http:                   
+          endpoint: "tempo:14268"      
         grpc:
           endpoint: "tempo:14250"
         thrift_binary:
@@ -266,48 +298,103 @@ distributor:
       endpoint: "tempo:55678"
 
 ingester:
-  max_block_duration: 5m               # cut the headblock when this much time passes. this is being set for demo purposes and should probably be left alone normally
+  max_block_duration: 5m               
 
 compactor:
   compaction:
-    block_retention: 720h                # overall Tempo trace retention. set for demo purposes
+    block_retention: 720h              
 
-metrics_generator:
-  registry:
-    external_labels:
-      source: tempo
-      cluster: docker-compose
-  storage:
-    path: /var/tempo/generator/wal
-    remote_write:
-      - url: http://prometheus:9090/api/v1/write
-        send_exemplars: true
-  traces_storage:
-    path: /var/tempo/generator/traces
-  processor:
-    local_blocks:
-      filter_server_spans: false
-      flush_to_storage: true
+# Note: The metrics_generator section below can be enabled for built-in service graphs.
+# Alternatively, use Alloy's servicegraph connector as shown in alloy-service-graphs example.
+# metrics_generator:
+#   registry:
+#     external_labels:
+#       source: tempo
+#       cluster: docker-compose
+#   storage:
+#     path: /var/tempo/generator/wal
+#     remote_write:
+#       - url: http://prometheus:9090/api/v1/write
+#         send_exemplars: true
+#   traces_storage:
+#     path: /var/tempo/generator/traces
+#   processor:
+#     local_blocks:
+#       filter_server_spans: false
+#       flush_to_storage: true
 
 storage:
   trace:
-    backend: local                     # backend configuration to use
+    backend: local                     
     wal:
-      path: /var/tempo/wal             # where to store the wal locally
+      path: /var/tempo/wal             
     local:
       path: /var/tempo/blocks
 
-overrides:
-  defaults:
-    metrics_generator:
-      processors: [service-graphs, span-metrics, local-blocks] # enables metrics generator
-      generate_native_histograms: both
+# Note: Service graph generation is commented out to allow using Alloy for this purpose.
+# overrides:
+#   defaults:
+#     metrics_generator:
+#       processors: [service-graphs, span-metrics, local-blocks]
+#       generate_native_histograms: both
 ```
 
-### Alloy Configuration (config.alloy)
+### Alloy Configuration with Service Graph Generation (config.alloy)
 
-```
-// Create your Alloy configuration here
+```river
+/*
+ * Alloy Configuration for OpenTelemetry Trace Collection with Service Graph Generation
+ */
+
+// Receive OpenTelemetry traces
+otelcol.receiver.otlp "default" {
+  http {}
+  grpc {}
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Batch processor to improve performance
+otelcol.processor.batch "default" {
+  output {
+    traces = [
+      otelcol.connector.servicegraph.default.input,
+      otelcol.exporter.otlp.tempo.input,
+    ]
+  }
+}
+
+// Service Graph Generator 
+otelcol.connector.servicegraph "default" {
+  metrics_flush_interval = "10s"
+  dimensions = ["http.method"]
+  
+  output {
+    metrics = [otelcol.exporter.otlphttp.prometheus.input]
+  }
+}
+
+// Send service graph metrics to Prometheus via OTLP
+otelcol.exporter.otlphttp "prometheus" {
+  client {
+    endpoint = "http://prometheus:9090/api/v1/otlp"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// Send traces to Tempo for storage and visualization
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
 ```
 
 ## README Template
@@ -325,6 +412,13 @@ Example:
 # Your Example Name
 
 Brief description of what this example demonstrates and its purpose.
+
+## Overview
+
+The example includes:
+- Component 1 (brief description)
+- Component 2 (brief description)
+- ...
 
 ## Running the Demo
 
@@ -358,6 +452,31 @@ Describe what the user should see after running the example, including:
 - What metrics/logs are being collected
 - Any dashboards that are automatically set up
 - How to interact with the example
+
+## Service Graphs (if applicable)
+
+If your example includes service graph visualization capabilities:
+
+1. Open Grafana (http://localhost:3000)
+2. Navigate to Explore
+3. Select the Tempo data source
+4. Click on the "Service Graph" tab
+5. You should see a visual representation of the relationships between services
+
+## Architecture
+
+```
+┌────────────┐     ┌──────────┐      ┌───────┐      ┌─────────┐
+│ Component1 │────▶│ Component2│─────▶│Component3│──▶│ Grafana │
+└────────────┘     └──────────┘      └───┬───┘      └─────────┘
+                                         │                ▲
+                                         ▼                │
+                                    ┌─────────┐           │
+                                    │Component4│───────────┘
+                                    └─────────┘
+```
+
+Brief explanation of the architecture and data flow.
 
 ## Additional Configuration
 

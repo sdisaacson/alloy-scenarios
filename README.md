@@ -27,6 +27,7 @@ The centralized approach allows you to manage all Docker image versions in a sin
 | [Kubernetes](k8s/) | A series of scenarios that demonstrate how to setup Alloy via the Kubernetes monitoring helm chart. Examples specific to each telemetry source are provided in the respective directories. |
 | [Logs from File](logs-file/) | Monitor logs from a file using Grafana Alloy. |
 | [OpenTelemetry Basic Tracing](otel-basic-tracing/) | Collect and visualize OpenTelemetry traces using Grafana Alloy and Tempo. |
+| [OpenTelemetry Traceing Service Graph Generation](otel-tracing-service-graphs/) | Learn how to generate service graphs from OpenTelemetry traces using Grafana Alloy and Tempo. |
 
 ## Contributing
 

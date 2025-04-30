@@ -6,6 +6,7 @@ services:
     image: prom/prometheus:${PROMETHEUS_VERSION:-v3.3.0}
     command:
       - --web.enable-remote-write-receiver
+      - --web.enable-otlp-receiver
       - --enable-feature=native-histograms
       - --enable-feature=exemplar-storage
       - --config.file=/etc/prometheus/prometheus.yml
@@ -14,7 +15,7 @@ services:
     volumes:
       - ./prom-config.yaml:/etc/prometheus/prometheus.yml
 
-  # Tempo for tracing
+  # Tempo for tracing without metrics generation
   tempo:
     image: grafana/tempo:${GRAFANA_TEMPO_VERSION:-2.7.2}
     command: ["-config.file=/etc/tempo.yaml"]
@@ -24,7 +25,7 @@ services:
       - ./tempo-config.yaml:/etc/tempo.yaml
     depends_on:
       - prometheus
-  
+
   memcached:
     image: memcached:1.6.29
     container_name: memcached
@@ -81,7 +82,7 @@ services:
       - prometheus
       - tempo
 
-  # Alloy for telemetry pipeline
+  # Alloy for telemetry pipeline and service graph generation
   alloy:
     image: grafana/alloy:${GRAFANA_ALLOY_VERSION:-v1.8.2}
     ports:
