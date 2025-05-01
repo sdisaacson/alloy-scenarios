@@ -58,38 +58,18 @@ You can also manually trigger trace generation using the web UI. The application
 
 This example demonstrates a more complex trace processing pipeline with the following components:
 
+> Note: In the case of tail sampling, this ensures that trace spans are presented to the tail sampler as early as possible, to ensure that a decision period includes all relevant spans for a trace. Batch processing potentially prevents spans from arriving at the sampler before a sampling decision is made once the first span for a trace has been seen. This can lead to incorrect decisions being made, and starts to rely on a cache being enabled for future sampling decisions.
+
 1. **OTLP Receiver**: Receives traces from the application via gRPC or HTTP
-2. **Batch Processor**: Groups spans for efficient processing
-3. **Transform Processor**: Modifies trace data before storage (used to set the service name for raw traces)
-4. **Tail Sampling Processor**: Applies sampling policies based on trace properties
-5. **OTLP Exporter**: Sends sampled traces to Tempo
-
-### Transform Processor
-
-The transform processor modifies the service name attribute for raw traces to differentiate them from sampled traces:
-
-```
-otelcol.processor.transform "default" {
-  error_mode = "ignore"
-
-  trace_statements {
-    context = "resource"
-    statements = [
-      `set(attributes["service.name"], "raw-traces")`,
-    ]
-  }
-
-  output {
-    traces  = [otelcol.exporter.otlp.tempo.input]
-  }
-}
-```
-
-This allows you to see both the original raw traces (with service.name="raw-traces") and the sampled traces (with service.name="trace-demo-tail-sampled") in Tempo.
+2. **Tail Sampling Processor**: Applies sampling policies based on trace properties
+3. **Batch Processor**: Groups spans for efficient processing
+4. **OTLP Exporter**: Sends sampled traces to Tempo
 
 ## Tail Sampling Configuration
 
 This example uses Alloy's `otelcol.processor.tail_sampling` processor, which makes sampling decisions based on the entire trace, not just individual spans. This allows for more intelligent sampling based on trace-wide properties.
+
+> Note: Tempo indexes upon TraceID's and SpanID's not resource attributes.  Make sure you only send When requesting trace IDs or carrying out TraceQL queries, this will mean that returned traces will in fact consist of whichever duplicate span is encountered first. This will mean that subsequent queries will potentially not yield the same result, and that the service names for spans in the same trace could be comprised of both raw-traces and trace-demo-tail-sampled in the same trace, or appear to be from a sampled trace when it was in fact unsampled, or vice versa. To ensure consistency, only one set of spans with a unique ID and traceID should be emitted to Tempo. 
 
 The tail sampling configuration includes the following policies:
 
@@ -180,7 +160,7 @@ livedebugging {
 }
 ```
 
-Access the live debugging interface at http://localhost:12345/debug/livedebugging to see:
+Access the live debugging interface at http://localhost:12345 to see:
 
 - Current processing pipeline state
 - Trace sampling decisions in real-time
@@ -207,7 +187,6 @@ To view the sampled traces:
 2. Navigate to Explore
 3. Select the Tempo data source
 4. Use the Search tab to find traces based on various criteria
-5. Try filtering by service name "trace-demo-tail-sampled" (sampled traces) vs "raw-traces" (all traces)
 
 ## Sample Queries
 
@@ -215,32 +194,27 @@ Try these queries in Grafana's Tempo Explorer:
 
 - Find all traces for the sampled service:
   ```
-  service.name="trace-demo-tail-sampled"
-  ```
-
-- Find all raw traces:
-  ```
-  service.name="raw-traces"
+  {resource.service.name="trace-demo-tail-sampled"}
   ```
 
 - Find error traces:
   ```
-  status.code="error"
+  {status=error}
   ```
 
 - Find high latency traces:
   ```
-  duration > 5s
+  {duration>5s}
   ```
 
 - Find traces with a specific attribute:
   ```
-  test_attr_key_1="test_attr_val_1"
+  {span.test_attr_key_1="test_attr_val_1"}
   ```
   
 - Find traces with Service D bottleneck:
   ```
-  service.latency="high" AND latency.category="bottleneck"
+  {span.service.latency="high" && span.latency.category="bottleneck"}
   ```
 
 ## Customizing

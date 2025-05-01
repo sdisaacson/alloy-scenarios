@@ -8,29 +8,7 @@ otelcol.receiver.otlp "default" {
   grpc {}
 
   output {
-    traces = [otelcol.processor.batch.default.input]
-  }
-}
-
-// Batch processor to improve performance
-otelcol.processor.batch "default" {
-  output {
-    traces = [otelcol.processor.tail_sampling.default.input, otelcol.processor.transform.default.input]
-  }
-}
-
-otelcol.processor.transform "default" {
-  error_mode = "ignore"
-
-  trace_statements {
-    context = "resource"
-    statements = [
-      `set(attributes["service.name"], "raw-traces")`,
-    ]
-  }
-
-  output {
-    traces  = [otelcol.exporter.otlp.tempo.input]
+    traces = [otelcol.processor.tail_sampling.default.input]
   }
 }
 
@@ -110,6 +88,13 @@ otelcol.processor.tail_sampling "default" {
     }
   }
   
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Batch processor to improve performance
+otelcol.processor.batch "default" {
   output {
     traces = [otelcol.exporter.otlp.tempo.input]
   }
