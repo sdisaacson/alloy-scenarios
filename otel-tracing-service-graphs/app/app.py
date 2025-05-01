@@ -250,21 +250,13 @@ def multi_service_trace():
         "transaction_id": transaction_id,
         "services": ["web-ui", "api-gateway", "auth-service", "user-service", "notification-service", "db-service"]
     }
-
+# code fixed thanks to @hedss
 def generate_multi_service_trace():
     """Generate a trace that spans multiple services with true service.name differentiation"""
     try:
         # Create a unique transaction ID for correlating spans
         transaction_id = str(uuid.uuid4())[:8]
-        
-        # Simulate a microservice architecture with:
-        # 1. Frontend service (web-ui)
-        # 2. API Gateway (api-gateway)
-        # 3. Authentication service (auth-service)
-        # 4. User service (user-service)
-        # 5. Notification service (notification-service)
-        # 6. Database service (db-service)
-        
+
         # Create a custom resource for each service
         web_ui_resource = Resource.create(attributes={SERVICE_NAME: "web-ui"})
         api_gw_resource = Resource.create(attributes={SERVICE_NAME: "api-gateway"})
@@ -272,7 +264,7 @@ def generate_multi_service_trace():
         user_resource = Resource.create(attributes={SERVICE_NAME: "user-service"})
         notif_resource = Resource.create(attributes={SERVICE_NAME: "notification-service"})
         db_resource = Resource.create(attributes={SERVICE_NAME: "db-service"})
-        
+
         # Create trace providers with each resource
         web_ui_provider = TracerProvider(resource=web_ui_resource)
         api_gw_provider = TracerProvider(resource=api_gw_resource)
@@ -280,7 +272,7 @@ def generate_multi_service_trace():
         user_provider = TracerProvider(resource=user_resource)
         notif_provider = TracerProvider(resource=notif_resource)
         db_provider = TracerProvider(resource=db_resource)
-        
+
         # Connect the providers to the same OTLP exporter via span processors
         web_ui_provider.add_span_processor(span_processor)
         api_gw_provider.add_span_processor(span_processor)
@@ -288,7 +280,7 @@ def generate_multi_service_trace():
         user_provider.add_span_processor(span_processor)
         notif_provider.add_span_processor(span_processor)
         db_provider.add_span_processor(span_processor)
-        
+
         # Create tracers for each service using their respective providers
         web_ui_tracer = web_ui_provider.get_tracer("web-ui-tracer")
         api_gw_tracer = api_gw_provider.get_tracer("api-gw-tracer")
@@ -296,61 +288,96 @@ def generate_multi_service_trace():
         user_tracer = user_provider.get_tracer("user-tracer")
         notif_tracer = notif_provider.get_tracer("notif-tracer")
         db_tracer = db_provider.get_tracer("db-tracer")
-        
+
         # 1. Frontend service (web-ui) - User logs in
-        with web_ui_tracer.start_as_current_span("login-page-render") as web_span:
+        with web_ui_tracer.start_as_current_span("login-page-render", kind=trace.SpanKind.SERVER) as web_span:
             web_span.set_attribute("component", "web-ui")
             web_span.set_attribute("transaction.id", transaction_id)
             web_span.set_attribute("user.action", "login")
             web_span.set_attribute("http.method", "GET")
             web_span.set_attribute("http.url", "/login")
             time.sleep(0.1)
-            
+
             # 2. Send login request to API Gateway
-            with api_gw_tracer.start_as_current_span("api-gateway-login-handler") as api_span:
-                api_span.set_attribute("component", "api-gateway")
-                api_span.set_attribute("transaction.id", transaction_id)
-                api_span.set_attribute("endpoint", "/api/v1/login")
-                api_span.set_attribute("http.method", "POST")
-                time.sleep(0.15)
-                
-                # 3. API Gateway calls Authentication Service
-                with auth_tracer.start_as_current_span("authenticate-user") as auth_span:
-                    auth_span.set_attribute("component", "auth-service")
-                    auth_span.set_attribute("transaction.id", transaction_id)
-                    auth_span.set_attribute("auth.method", "password")
-                    time.sleep(0.2)
-                    
-                    # 4. Auth service calls User Service to retrieve user details
-                    with user_tracer.start_as_current_span("get-user-details") as user_span:
-                        user_span.set_attribute("component", "user-service")
-                        user_span.set_attribute("transaction.id", transaction_id)
-                        user_span.set_attribute("user.id", f"user_{random.randint(1000, 9999)}")
-                        
-                        # 5. User service calls DB Service
-                        with db_tracer.start_as_current_span("db-query") as db_span:
-                            db_span.set_attribute("component", "db-service")
-                            db_span.set_attribute("transaction.id", transaction_id)
-                            db_span.set_attribute("db.operation", "SELECT")
-                            db_span.set_attribute("db.table", "users")
-                            
-                            # Randomly introduce database latency
-                            if random.random() < 0.3:
-                                delay = random.uniform(0.5, 1.5)
-                                db_span.set_attribute("db.latency", delay)
-                                db_span.set_attribute("latency.category", "slow-query")
-                                time.sleep(delay)
-                            else:
-                                time.sleep(0.1)
-                
-                # 6. After successful login, send notification
-                with notif_tracer.start_as_current_span("send-login-notification") as notif_span:
-                    notif_span.set_attribute("component", "notification-service")
-                    notif_span.set_attribute("transaction.id", transaction_id)
-                    notif_span.set_attribute("notification.type", "login_alert")
-                    notif_span.set_attribute("notification.channel", random.choice(["email", "sms", "push"]))
+            with web_ui_tracer.start_as_current_span("api-gateway-request", kind=trace.SpanKind.CLIENT) as web_client_span:
+                web_client_span.set_attribute("component", "web-ui")
+                web_client_span.set_attribute("transaction.id", transaction_id)
+                web_client_span.set_attribute("http.method", "POST")
+                web_client_span.set_attribute("http.url", "/api/v1/login")
+
+                # API Gateway receives the request
+                with api_gw_tracer.start_as_current_span("api-gateway-login-handler", kind=trace.SpanKind.SERVER) as api_span:
+                    api_span.set_attribute("component", "api-gateway")
+                    api_span.set_attribute("transaction.id", transaction_id)
+                    api_span.set_attribute("endpoint", "/api/v1/login")
+                    api_span.set_attribute("http.method", "POST")
                     time.sleep(0.15)
-        
+
+                    # 3. API Gateway calls Authentication Service
+                    with api_gw_tracer.start_as_current_span("auth-service-request", kind=trace.SpanKind.CLIENT) as api_client_span:
+                        api_client_span.set_attribute("component", "api-gateway")
+                        api_client_span.set_attribute("transaction.id", transaction_id)
+                        api_client_span.set_attribute("http.method", "POST")
+                        api_client_span.set_attribute("http.url", "/auth/authenticate")
+
+                        # Auth service receives the request
+                        with auth_tracer.start_as_current_span("authenticate-user", kind=trace.SpanKind.SERVER) as auth_span:
+                            auth_span.set_attribute("component", "auth-service")
+                            auth_span.set_attribute("transaction.id", transaction_id)
+                            auth_span.set_attribute("auth.method", "password")
+                            time.sleep(0.2)
+
+                            # 4. Auth service calls User Service
+                            with auth_tracer.start_as_current_span("user-service-request", kind=trace.SpanKind.CLIENT) as auth_client_span:
+                                auth_client_span.set_attribute("component", "auth-service")
+                                auth_client_span.set_attribute("transaction.id", transaction_id)
+                                auth_client_span.set_attribute("http.method", "GET")
+                                auth_client_span.set_attribute("http.url", "/user/details")
+
+                                # User service receives the request
+                                with user_tracer.start_as_current_span("get-user-details", kind=trace.SpanKind.SERVER) as user_span:
+                                    user_span.set_attribute("component", "user-service")
+                                    user_span.set_attribute("transaction.id", transaction_id)
+                                    user_span.set_attribute("user.id", f"user_{random.randint(1000, 9999)}")
+
+                                    # 5. User service calls DB Service
+                                    with user_tracer.start_as_current_span("db-service-request", kind=trace.SpanKind.CLIENT) as user_client_span:
+                                        user_client_span.set_attribute("component", "user-service")
+                                        user_client_span.set_attribute("transaction.id", transaction_id)
+                                        user_client_span.set_attribute("db.operation", "SELECT")
+                                        user_client_span.set_attribute("db.table", "users")
+
+                                        # DB service receives the request
+                                        with db_tracer.start_as_current_span("db-query", kind=trace.SpanKind.SERVER) as db_span:
+                                            db_span.set_attribute("component", "db-service")
+                                            db_span.set_attribute("transaction.id", transaction_id)
+                                            db_span.set_attribute("db.operation", "SELECT")
+                                            db_span.set_attribute("db.table", "users")
+
+                                            # Randomly introduce database latency
+                                            if random.random() < 0.3:
+                                                delay = random.uniform(0.5, 1.5)
+                                                db_span.set_attribute("db.latency", delay)
+                                                db_span.set_attribute("latency.category", "slow-query")
+                                                time.sleep(delay)
+                                            else:
+                                                time.sleep(0.1)
+
+                    # 6. After successful login, send notification
+                    with api_gw_tracer.start_as_current_span("notification-service-request", kind=trace.SpanKind.CLIENT) as notif_client_span:
+                        notif_client_span.set_attribute("component", "api-gateway")
+                        notif_client_span.set_attribute("transaction.id", transaction_id)
+                        notif_client_span.set_attribute("http.method", "POST")
+                        notif_client_span.set_attribute("http.url", "/notifications/send")
+
+                        # Notification service receives the request
+                        with notif_tracer.start_as_current_span("send-login-notification", kind=trace.SpanKind.SERVER) as notif_span:
+                            notif_span.set_attribute("component", "notification-service")
+                            notif_span.set_attribute("transaction.id", transaction_id)
+                            notif_span.set_attribute("notification.type", "login_alert")
+                            notif_span.set_attribute("notification.channel", random.choice(["email", "sms", "push"]))
+                            time.sleep(0.15)
+
         return transaction_id
     except Exception as e:
         print(f"Error generating multi-service trace: {e}")

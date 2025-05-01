@@ -25,7 +25,7 @@ otelcol.processor.batch "default" {
 // Service Graph Generator 
 otelcol.connector.servicegraph "default" {
   metrics_flush_interval = "10s"
-  dimensions = ["service.name"]
+  dimensions = ["service.name", "http.method"]
   
   // Configure the span store for better pairing
   store {
