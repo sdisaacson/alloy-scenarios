@@ -1,0 +1,136 @@
+/* General styles */
+body {
+    background-color: #f4f4f4;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container-fluid {
+    flex: 1;
+}
+
+/* Map styles */
+.map-background {
+    background-color: #e9ecef;
+    background-image: url('../img/parchment-bg.jpg');
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+/* Faction-specific styles */
+.southern-text {
+    color: #8B0000 !important;
+}
+
+.northern-text {
+    color: #343a40 !important;
+}
+
+.neutral-text {
+    color: #6c757d !important;
+}
+
+/* Location marker animations */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    }
+}
+
+.location-marker.pulsing {
+    animation: pulse 1.5s infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Location marker styles */
+.location-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.location-marker:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+}
+
+.location-marker.selected {
+    box-shadow: 0 0 15px #fff, 0 0 20px #fff;
+}
+
+.location-marker.capital {
+    width: 50px;
+    height: 50px;
+}
+
+.location-marker.southern {
+    background-color: #8B0000;
+}
+
+.location-marker.northern {
+    background-color: #343a40;
+}
+
+.location-marker.neutral {
+    background-color: #6c757d;
+}
+
+.badge.southern {
+    background-color: #8B0000 !important;
+}
+
+.badge.northern {
+    background-color: #343a40 !important;
+}
+
+.badge.neutral {
+    background-color: #6c757d !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .location-marker {
+        width: 30px !important;
+        height: 30px !important;
+    }
+    
+    .location-marker.capital {
+        width: 40px !important;
+        height: 40px !important;
+    }
+} 

@@ -1,0 +1,291 @@
+version: '3.8'
+
+services:
+  loki:
+    image: grafana/loki:${GRAFANA_LOKI_VERSION:-3.5.0}
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.3.0}
+    command:
+      - --web.enable-remote-write-receiver
+      - --web.enable-otlp-receiver
+      - --enable-feature=native-histograms
+      - --enable-feature=exemplar-storage
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - 9090:9090/tcp
+    volumes:
+      - ./prom-config.yaml:/etc/prometheus/prometheus.yml
+
+  # Tempo for tracing
+  tempo:
+    image: grafana/tempo:${GRAFANA_TEMPO_VERSION:-2.7.2}
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - 3200:3200/tcp    # tempo
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+    depends_on:
+      - prometheus
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-11.6.1}
+    environment:
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_BASIC_ENABLED=false
+      - GF_INSTALL_PLUGINS=https://storage.googleapis.com/integration-artifacts/grafana-exploretraces-app/grafana-exploretraces-app-latest.zip;grafana-traces-app
+    ports:
+      - 3000:3000/tcp
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        mkdir -p /etc/grafana/provisioning/datasources
+        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+        apiVersion: 1
+        datasources:
+        - name: Prometheus
+          type: prometheus
+          orgId: 1
+          url: http://prometheus:9090
+          basicAuth: false
+          isDefault: false
+          version: 1
+          editable: false
+        - name: Tempo
+          type: tempo
+          access: proxy
+          orgId: 1
+          url: http://tempo:3200
+          basicAuth: false
+          isDefault: true
+          version: 1
+          editable: false
+          jsonData:
+            serviceMap:
+              datasourceUid: 'Prometheus'
+            nodeGraph:
+              enabled: true
+        - name: Loki
+          type: loki
+          access: proxy
+          orgId: 1
+          url: http://loki:3100
+          basicAuth: false
+          isDefault: false
+        
+        EOF
+        /run.sh
+    depends_on:
+      - prometheus
+      - tempo
+
+  # Alloy for telemetry pipeline and tail sampling
+  alloy:
+    image: grafana/alloy:${GRAFANA_ALLOY_VERSION:-v1.8.2}
+    ports:
+      - 12345:12345      # Alloy HTTP server
+      - 4317:4317/tcp    # OTLP gRPC
+      - 4318:4318/tcp    # OTLP HTTP
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+
+  # Game of Kingdoms War Game Services
+  
+  # Database initialization service
+  game-db-init:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    volumes:
+      - game-data:/data
+    environment:
+      - DATABASE_FILE=/data/game_state.db
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('southern_capital'); print('Database initialized')"]
+
+  # Southern Capital
+  southern-capital:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - LOCATION_ID=southern_capital
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=southern-capital
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('southern_capital'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Northern Capital
+  northern-capital:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5002:5002"
+    environment:
+      - LOCATION_ID=northern_capital
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=northern-capital
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('northern_capital'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Village 1
+  village-1:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5003:5003"
+    environment:
+      - LOCATION_ID=village_1
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=village-1
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('village_1'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Village 2
+  village-2:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5004:5004"
+    environment:
+      - LOCATION_ID=village_2
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=village-2
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('village_2'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Village 3
+  village-3:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5005:5005"
+    environment:
+      - LOCATION_ID=village_3
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=village-3
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('village_3'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Village 4
+  village-4:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5006:5006"
+    environment:
+      - LOCATION_ID=village_4
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=village-4
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('village_4'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Village 5
+  village-5:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5007:5007"
+    environment:
+      - LOCATION_ID=village_5
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=village-5
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('village_5'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+
+  # Village 6
+  village-6:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5008:5008"
+    environment:
+      - LOCATION_ID=village_6
+      - FLASK_APP=location_server.py
+      - LOCATION_NAME=village-6
+      - DATABASE_FILE=/data/game_state.db
+    volumes:
+      - game-data:/data
+    command: ["python", "-c", "from location_server import LocationServer; server = LocationServer('village_6'); server.run()"]
+    depends_on:
+      - alloy
+      - game-db-init
+      
+  # Web-based war map application
+  war-map:
+    build:
+      context: ./war_map
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_FILE=/data/game_state.db
+      - LOCATION_NAME=war-map
+      - SECRET_KEY=war_of_westeros_secret_key
+    volumes:
+      - game-data:/data
+    depends_on:
+      - southern-capital
+      - northern-capital
+      - village-1
+      - village-2
+      - village-3
+      - village-4
+      - village-5
+      - village-6
+
+volumes:
+  game-data: 

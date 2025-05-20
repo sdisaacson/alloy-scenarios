@@ -84,7 +84,7 @@ export POD_NAME=$(kubectl get pods --namespace meta -l "app.kubernetes.io/name=g
 Next, port-forward the Grafana pod to your local machine:
 
 ```bash
-kubectl --namespace meta port-forward $POD_NAME 3000
+ls $POD_NAME 3000
 ```
 
 Open your browser and go to [http://localhost:3000](http://localhost:3000). You can log in with the default username `admin` and password `adminadminadmin`.

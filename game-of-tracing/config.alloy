@@ -1,0 +1,51 @@
+/*
+ * Alloy Configuration for OpenTelemetry Trace Collection with Tail Sampling
+ */
+
+// Receive OpenTelemetry traces
+otelcol.receiver.otlp "default" {
+  http {}
+  grpc {}
+
+  output {
+    metrics = [otelcol.processor.batch.default.input]
+    logs = [otelcol.processor.batch.default.input]
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// Batch processor to improve performance
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+    logs = [otelcol.exporter.otlphttp.logs.input]
+    metrics = [otelcol.exporter.otlphttp.metrics.input]
+  }
+}
+
+// Send sampled traces to Tempo
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+} 
+
+otelcol.exporter.otlphttp "logs" {
+  client {
+    endpoint = "http://loki:3100/otlp"
+  }
+
+}
+
+otelcol.exporter.otlphttp "metrics" {
+  client {
+    endpoint = "http://prometheus:9090/api/v1/otlp"
+  }
+}
+
+livedebugging {
+  enabled = true
+}
