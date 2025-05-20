@@ -547,7 +547,7 @@ def all_out_attack():
         location_id = request.json.get('location_id')
         if not location_id:
             span.set_status(trace.StatusCode.ERROR, "Missing location ID")
-            return jsonify({"error": "Location ID required"}), 400
+            return jsonify({"success": False, "message": "Location ID required"}), 400
         
         span.set_attribute("source_location", location_id)
         
@@ -572,6 +572,24 @@ def all_out_attack():
             if 'error' in result:
                 span.set_status(trace.StatusCode.ERROR, f"Error from location server: {result['error']}")
                 return jsonify({"success": False, "message": f"Error from location server: {result['error']}"}), 500
+            
+            # Check if this attack resulted in game over
+            if result.get('success'):
+                locations_data = {}
+                for loc_id in LOCATION_POSITIONS.keys():
+                    data = make_api_request(loc_id, '')
+                    if 'error' not in data:
+                        locations_data[loc_id] = {
+                            'faction': data['faction']
+                        }
+                
+                if check_game_over(locations_data):
+                    result['game_over'] = True
+                    result['winner'] = WINNER
+                    result['victory_message'] = VICTORY_MESSAGE
+                    span.set_attribute("game_over", True)
+                    span.set_attribute("winner", WINNER)
+            
             return jsonify(result)
         except Exception as e:
             span.record_exception(e)

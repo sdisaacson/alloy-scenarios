@@ -675,7 +675,14 @@
                 // Refresh location panel
                 selectLocation(locationId);
             } else {
-                showActionStatus('danger', result.message || 'Failed to collect resources');
+                if (result.cooldown && result.cooldown_seconds) {
+                    // Start cooldown timer
+                    startCooldownTimer(result.cooldown_seconds);
+                    // Show cooldown message
+                    showActionStatus('warning', result.message);
+                } else {
+                    showActionStatus('danger', result.message || 'Failed to collect resources');
+                }
             }
         } catch (error) {
             showActionStatus('danger', 'Network error. Please try again.');
@@ -728,15 +735,40 @@
             if (result.success || result.message) {
                 showMoveArmyStatus('success', result.message);
                 
+                // Create transfer indicator for army movement
+                createTransferIndicator(
+                    sourceId,
+                    targetId,
+                    gameState.playerFaction,
+                    'attack'
+                );
+                
+                // Start periodic updates to show army movement
+                let updateCount = 0;
+                const maxUpdates = 4; // Update 4 times during movement
+                
+                const updateInterval = setInterval(() => {
+                    refreshMapData();
+                    updateCount++;
+                    
+                    if (updateCount >= maxUpdates) {
+                        clearInterval(updateInterval);
+                    }
+                }, 2500); // Update every 2.5 seconds
+                
                 // Check if this move resulted in game over
                 if (result.game_over) {
                     gameState.gameOver = true;
                     gameState.winner = result.winner;
                     gameState.victoryMessage = result.victory_message;
+                    checkGameOver();
                 }
                 
-                // Army movement impacts multiple locations, so refresh the whole map
-                refreshMapData();
+                // Close the move army modal
+                const moveArmyModal = bootstrap.Modal.getInstance(document.getElementById('moveArmyModal'));
+                if (moveArmyModal) {
+                    moveArmyModal.hide();
+                }
             } else {
                 showMoveArmyStatus('danger', result.error || 'Failed to move army');
             }
@@ -969,6 +1001,10 @@
         const timeSpan = cooldownSpan.querySelector('span');
         const collectBtn = document.getElementById('collectResourcesBtn');
         let timeLeft = seconds;
+
+        // Show cooldown indicator
+        cooldownSpan.classList.remove('d-none');
+        collectBtn.disabled = true;
 
         const timer = setInterval(() => {
             timeLeft--;

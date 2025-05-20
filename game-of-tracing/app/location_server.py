@@ -30,6 +30,9 @@ class LocationServer:
         self.logger = self.telemetry.get_logger()
         self.tracer = self.telemetry.get_tracer()
         
+        # Give telemetry access to location state
+        self.telemetry._get_location_state = self._get_location_state
+        
         self.setup_routes()
         self.db_path = os.environ.get('DATABASE_FILE', DATABASE_FILE)
         self._initialize_database()
@@ -109,6 +112,11 @@ class LocationServer:
         )
         conn.commit()
         conn.close()
+
+        # Force metric collection on important state changes
+        if faction is not None or resources is not None or army is not None:
+            self.telemetry.collect_metrics()
+            
         return True
 
     def _find_path(self, target: str, path_type: PathType) -> Optional[List[str]]:
@@ -172,16 +180,24 @@ class LocationServer:
         """Handle battle between armies and return result."""
         # Same faction = reinforcement
         if attacking_faction == defending_faction:
+            self.logger.info(f"Reinforcement battle between {attacking_faction} armies")
+            self.telemetry.record_battle(attacking_faction, defending_faction, "reinforcement")
             return "reinforcement", attacking_army + defending_army, attacking_faction
         
         # Actual combat
         if attacking_army > defending_army:
+            self.logger.info(f"Attacker victory: {attacking_army} vs {defending_army}")
             remaining = attacking_army - defending_army
+            self.telemetry.record_battle(attacking_faction, defending_faction, "attacker_victory")
             return "attacker_victory", remaining, attacking_faction
         elif defending_army > attacking_army:
             remaining = defending_army - attacking_army
+            self.logger.info(f"Defender victory: {defending_army} vs {attacking_army}")
+            self.telemetry.record_battle(attacking_faction, defending_faction, "defender_victory")
             return "defender_victory", remaining, defending_faction
         else:
+            self.logger.info(f"Stalemate: {attacking_army} vs {defending_army}")
+            self.telemetry.record_battle(attacking_faction, defending_faction, "stalemate")
             return "stalemate", 0, defending_faction
 
     def _continue_army_movement(self, army_size: int, faction: str, current_loc: str, 
@@ -225,6 +241,9 @@ class LocationServer:
                             movement_span.set_status(trace.StatusCode.ERROR, "Army movement failed")
                             movement_span.set_attribute("error", result.get("message", "Unknown error"))
                             self.logger.error(f"Army movement failed: {result.get('message', 'Unknown error')}")
+                        else:
+                            # Force metric collection after successful army movement
+                            self.telemetry.collect_metrics()
                 
             except Exception as e:
                 self.logger.error(f"Failed to move army to {next_loc}: {str(e)}")
@@ -232,6 +251,9 @@ class LocationServer:
         
         # Start movement in background thread
         Thread(target=move).start()
+        
+        # Force metric collection at the start of movement
+        self.telemetry.collect_metrics()
         
         # Return immediate response indicating movement has started
         return {
@@ -281,6 +303,8 @@ class LocationServer:
                         if result.get("success", False):
                             current_loc_resources = self._get_location_state(current_loc)['resources']
                             self._update_location_state(current_loc, resources=current_loc_resources - resources)
+                            # Force metric collection after successful resource transfer
+                            self.telemetry.collect_metrics()
                         else:
                             movement_span.set_status(trace.StatusCode.ERROR, "Resource transfer failed")
                 
@@ -316,11 +340,14 @@ class LocationServer:
                 self.logger.error(f"Request failed: {str(e)}")
                 raise
 
-    def _can_collect_resources(self) -> tuple[bool, Optional[str]]:
-        """Check if location can collect resources."""
+    def _can_collect_resources(self) -> tuple[bool, Optional[str], Optional[int]]:
+        """Check if location can collect resources.
+        Returns:
+            tuple: (can_collect, message, cooldown_seconds)
+        """
         with self.lock:
             if self.location_info["type"] != "capital":
-                return False, "Only capitals can manually collect resources"
+                return False, "Only capitals can manually collect resources", None
             
             now = datetime.now()
             
@@ -329,7 +356,7 @@ class LocationServer:
                 cooldown_end = self.resource_cooldown[self.location_id]
                 if now < cooldown_end:
                     remaining = (cooldown_end - now).seconds
-                    return False, f"Resource generation on cooldown for {remaining} more seconds"
+                    return False, f"Resource generation on cooldown for {remaining} seconds", remaining
             
             # Check collection cooldown
             last_time = self.last_resource_collection.get(self.location_id, datetime.min)
@@ -337,9 +364,9 @@ class LocationServer:
             
             if now - last_time < wait_time:
                 remaining = wait_time - (now - last_time)
-                return False, f"Must wait {remaining.seconds} seconds to collect resources"
+                return False, f"Must wait {remaining.seconds} seconds to collect resources", remaining.seconds
             
-            return True, None
+            return True, None, None
 
     def _start_resource_cooldown(self):
         with self.lock:
@@ -360,6 +387,8 @@ class LocationServer:
                 current_resources = location_state["resources"]
                 new_resources = current_resources + RESOURCE_GENERATION["village"]
                 self._update_location_state(self.location_id, resources=new_resources)
+                # Force metric collection after passive resource generation
+                self.telemetry.collect_metrics()
         
         Thread(target=generate_resources, daemon=True).start()
 
@@ -412,9 +441,15 @@ class LocationServer:
         
         @self.app.route('/collect_resources', methods=['POST'])
         def collect_resources():
-            can_collect, message = self._can_collect_resources()
+            """Collect resources from a location"""
+            can_collect, message, cooldown_seconds = self._can_collect_resources()
             if not can_collect:
-                return jsonify({"success": False, "message": message}), 400
+                return jsonify({
+                    "success": False,
+                    "message": message,
+                    "cooldown": True,
+                    "cooldown_seconds": cooldown_seconds
+                }), 200  # Return 200 for cooldown, as it's an expected state
             
             location_type = self.location_info["type"]
             resources_gained = RESOURCE_GENERATION[location_type]
@@ -426,10 +461,14 @@ class LocationServer:
             with self.lock:
                 self.last_resource_collection[self.location_id] = datetime.now()
             
+            # Force metric collection after resource update
+            self.telemetry.collect_metrics()
+            
             return jsonify({
                 "success": True,
                 "message": f"Collected {resources_gained} resources",
-                "current_resources": new_resources
+                "current_resources": new_resources,
+                "cooldown": False
             })
         
         @self.app.route('/create_army', methods=['POST'])
@@ -459,6 +498,9 @@ class LocationServer:
                 resources=new_resources,
                 army=new_army
             )
+            
+            # Force metric collection after army creation
+            self.telemetry.collect_metrics()
             
             return jsonify({
                 "success": True,
@@ -493,7 +535,11 @@ class LocationServer:
             try:
                 army_size = location_state["army"]
                 current_faction = location_state["faction"]
+                # Update the source location's army to 0
                 self._update_location_state(self.location_id, army=0)
+                
+                # Force metric collection after army leaves the location
+                self.telemetry.collect_metrics()
                 
                 result = self._continue_army_movement(
                     army_size,
@@ -513,6 +559,7 @@ class LocationServer:
         
         @self.app.route('/all_out_attack', methods=['POST'])
         def all_out_attack():
+            """Launch an all-out attack from a capital to the enemy capital"""
             context = extract(request.headers)
             
             with self.tracer.start_as_current_span(
@@ -543,7 +590,8 @@ class LocationServer:
                             "message": "No army available for attack"
                         }), 400
                     
-                    target_capital = "southern_capital" if faction == "southern" else "northern_capital"
+                    # Determine enemy capital based on faction
+                    target_capital = "northern_capital" if faction == "southern" else "southern_capital"
                     attack_span.set_attribute("target_capital", target_capital)
                     
                     attack_path = self._find_path(target_capital, PathType.ATTACK)
@@ -631,6 +679,8 @@ class LocationServer:
                     battle_span.set_attribute("source_location", source_location)
                     battle_span.set_attribute("attacking_army", attacking_army)
                     battle_span.set_attribute("defending_army", defending_army)
+
+                    self.logger.info(f"Received army at {self.location_id}: {data}")
                     
                     if attacking_faction == defending_faction:
                         # For all-out attacks, combine armies with friendly villages
@@ -640,6 +690,7 @@ class LocationServer:
                             # Set village's army to 0
                             self._update_location_state(self.location_id, army=0)
                             battle_span.set_attribute("combined_army_size", attacking_army)
+                            self.logger.info(f"Combined armies at {self.location_id}: {attacking_army}")
                         
                         if is_attack_move and remaining_path:
                             result = self._continue_army_movement(
@@ -651,11 +702,17 @@ class LocationServer:
                                 is_attack_move
                             )
                             battle_span.set_attribute("result", "friendly_passage")
+                            self.logger.info(f"Friendly passage result: {result}")
+                            # Force metric collection after friendly passage
+                            self.telemetry.collect_metrics()
                             return jsonify(result)
                         else:
                             new_army = defending_army + attacking_army
                             self._update_location_state(self.location_id, army=new_army)
                             battle_span.set_attribute("result", "armies_combined")
+                            self.logger.info(f"Armies combined at {self.location_info['name']}: {new_army}")
+                            # Force metric collection after combining armies
+                            self.telemetry.collect_metrics()
                             return jsonify({
                                 "success": True,
                                 "message": f"Armies combined at {self.location_info['name']}",
@@ -680,6 +737,7 @@ class LocationServer:
                     battle_span.set_attribute("remaining_army", remaining_army)
                     
                     if battle_result == "attacker_victory" and is_attack_move and remaining_path:
+                        self.logger.info(f"Continuing army movement at {self.location_id}: {remaining_army}")
                         result = self._continue_army_movement(
                             remaining_army,
                             attacking_faction,
@@ -691,7 +749,11 @@ class LocationServer:
                         return jsonify(result)
                     
                     if battle_result != "attacker_victory":
+                        self.logger.warning(f"Battle result: {battle_result}")
                         battle_span.set_status(trace.StatusCode.ERROR, f"Attack {battle_result}")
+                    
+                    # Force metric collection after battle resolution
+                    self.telemetry.collect_metrics()
                     
                     return jsonify({
                         "success": battle_result == "attacker_victory",
@@ -715,8 +777,8 @@ class LocationServer:
                 "send_resources_to_capital",
                 kind=SpanKind.SERVER,
                 attributes={
-                    "player.name": session.get('player_name', 'Unknown'),
-                    "player.faction": session.get('faction', 'Unknown')
+                    "location": self.location_id,
+                    "location_type": self.location_info["type"]
                 }
             ) as span:
                 location_state = self._get_location_state(self.location_id)
@@ -728,6 +790,7 @@ class LocationServer:
                 
                 if self.location_info["type"] != "village":
                     span.set_status(trace.Status(trace.StatusCode.ERROR, "Only villages can send resources"))
+                    self.logger.error(f"Only villages can send resources to capital")
                     return jsonify({
                         "success": False,
                         "message": "Only villages can send resources to capital"
@@ -735,6 +798,7 @@ class LocationServer:
                 
                 if faction not in ['southern', 'northern']:
                     span.set_status(trace.Status(trace.StatusCode.ERROR, "Village must belong to a faction"))
+                    self.logger.error(f"Village must belong to a faction to send resources")
                     return jsonify({
                         "success": False,
                         "message": "Village must belong to a faction to send resources"
@@ -745,6 +809,7 @@ class LocationServer:
                 path = self._find_path(target_capital, PathType.RESOURCE)
                 if not path:
                     span.set_status(trace.Status(trace.StatusCode.ERROR, "No valid path to capital"))
+                    self.logger.error(f"No valid path to capital found")
                     return jsonify({
                         "success": False,
                         "message": "No valid path to capital found"
@@ -754,6 +819,9 @@ class LocationServer:
                 
                 if self._transfer_resources_along_path(current_resources, path):
                     self._start_resource_cooldown()
+                    self.logger.info(f"Resources sent to capital via {path}")
+                    # Force metric collection after initiating resource transfer
+                    self.telemetry.collect_metrics()
                     return jsonify({
                         "success": True,
                         "message": f"Sending {current_resources} resources to capital via {' -> '.join(path)}",
@@ -762,6 +830,7 @@ class LocationServer:
                     })
                 else:
                     span.set_status(trace.Status(trace.StatusCode.ERROR, "Failed to start resource transfer"))
+                    self.logger.error(f"Failed to start resource transfer")
                     return jsonify({
                         "success": False,
                         "message": "Failed to start resource transfer"
@@ -800,6 +869,9 @@ class LocationServer:
                 if current_faction != faction:
                     transfer_span.set_status(trace.Status(trace.StatusCode.ERROR, f"Resources captured by {current_faction}"))
                     self._update_location_state(self.location_id, resources=current_resources + incoming_resources)
+                    # Force metric collection after resource capture
+                    self.telemetry.collect_metrics()
+                    self.logger.error(f"Resources captured by {current_faction}")
                     return jsonify({
                         "success": False,
                         "message": f"Resources captured by {current_faction}!",
@@ -808,6 +880,9 @@ class LocationServer:
                 
                 new_resources = current_resources + incoming_resources
                 self._update_location_state(self.location_id, resources=new_resources)
+                # Force metric collection after receiving resources
+                self.telemetry.collect_metrics()
+                self.logger.info(f"Resources updated to {new_resources}")
                 
                 if len(remaining_path) > 1:
                     next_loc = remaining_path[1]
@@ -822,7 +897,7 @@ class LocationServer:
                             try:
                                 time.sleep(5)
                                 target_url = f"{self.get_location_url(next_loc)}/receive_resources"
-                                
+                                self.logger.info(f"Sending resources to {next_loc} with target URL: {target_url}")
                                 result = self._make_request_with_trace('post', target_url, {
                                     "resources": incoming_resources,
                                     "source_location": self.location_id,
@@ -836,6 +911,9 @@ class LocationServer:
                                 current_state = self._get_location_state(self.location_id)
                                 self._update_location_state(self.location_id, 
                                     resources=current_state["resources"] - incoming_resources)
+                                # Force metric collection after forwarding resources
+                                self.telemetry.collect_metrics()
+                                self.logger.info(f"Resources updated to {current_state['resources'] - incoming_resources}")
                             except Exception as e:
                                 movement_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                                 self.logger.error(f"Failed to forward resources to {next_loc}: {str(e)}")
@@ -846,6 +924,7 @@ class LocationServer:
                 if self.location_info["type"] == "capital":
                     transfer_span.set_attribute("resources_reached_capital", True)
                 
+                self.logger.info(f"Resources received at {self.location_info['name']}")
                 return jsonify({
                     "success": True,
                     "message": f"Resources received at {self.location_info['name']}",

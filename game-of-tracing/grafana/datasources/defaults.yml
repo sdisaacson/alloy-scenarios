@@ -1,0 +1,49 @@
+apiVersion: 1
+datasources:
+- name: prometheus
+  type: prometheus
+  orgId: 1
+  url: http://prometheus:9090
+  basicAuth: false
+  isDefault: false
+  version: 1
+  editable: false
+  jsonData:
+    exemplarTraceIdDestinations:
+      - datasourceUid: "tempo"
+        name: "trace_id"
+- name: tempo
+  type: tempo
+  access: proxy
+  orgId: 1
+  url: http://tempo:3200
+  basicAuth: false
+  isDefault: true
+  version: 1
+  editable: false
+  jsonData:
+    serviceMap:
+      datasourceUid: 'prometheus'
+    nodeGraph:
+      enabled: true
+    tracesToLogsV2:
+      datasourceUid: 'loki'
+      filterBySpanID: true
+    tracesToMetrics:
+      datasourceUid: 'prometheus'
+- name: loki
+  type: loki
+  access: proxy
+  orgId: 1
+  url: http://loki:3100
+  basicAuth: false
+  isDefault: false
+  jsonData:
+    derivedFields:
+      - datasourceUid: "tempo"
+        matcherRegex: "trace_id"
+        matcherType: "label"
+        name: "trace_id"
+        targetBlank: true
+        url: "$${__value.raw}"
+        urlDisplayLabel: ""
