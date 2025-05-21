@@ -511,51 +511,78 @@ class LocationServer:
         
         @self.app.route('/move_army', methods=['POST'])
         def move_army():
-            data = request.get_json()
-            if not data or 'target_location' not in data:
-                return jsonify({"success": False, "message": "Target location not specified"}), 400
+            # Extract trace context from request headers
+            context = extract(request.headers)
             
-            target_location = data['target_location']
-            remaining_path = data.get('remaining_path', [])
-            is_attack_move = data.get('is_attack_move', False)
-            
-            if target_location not in self.location_info["connections"]:
-                return jsonify({
-                    "success": False,
-                    "message": f"Cannot move to {target_location}. Not connected to {self.location_id}"
-                }), 400
-            
-            location_state = self._get_location_state(self.location_id)
-            if location_state["army"] <= 0:
-                return jsonify({
-                    "success": False,
-                    "message": "No army to move"
-                }), 400
-            
-            try:
-                army_size = location_state["army"]
-                current_faction = location_state["faction"]
-                # Update the source location's army to 0
-                self._update_location_state(self.location_id, army=0)
+            with self.tracer.start_as_current_span(
+                "move_army_request",
+                context=context,
+                kind=SpanKind.SERVER,
+                attributes={
+                    "service.name": self.location_info["name"],
+                    "location_type": self.location_info["type"]
+                }
+            ) as move_span:
+                data = request.get_json()
+                if not data or 'target_location' not in data:
+                    move_span.set_status(trace.StatusCode.ERROR, "Target location not specified")
+                    return jsonify({"success": False, "message": "Target location not specified"}), 400
                 
-                # Force metric collection after army leaves the location
-                self.telemetry.collect_metrics()
+                target_location = data['target_location']
+                remaining_path = data.get('remaining_path', [])
+                is_attack_move = data.get('is_attack_move', False)
                 
-                result = self._continue_army_movement(
-                    army_size,
-                    current_faction,
-                    self.location_id,
-                    target_location,
-                    remaining_path,
-                    is_attack_move
-                )
+                move_span.set_attribute("target_location", target_location)
+                move_span.set_attribute("is_attack_move", is_attack_move)
                 
-                return jsonify(result)
-            except Exception as e:
-                return jsonify({
-                    "success": False,
-                    "message": f"Failed to move army: {str(e)}"
-                }), 500
+                if target_location not in self.location_info["connections"]:
+                    move_span.set_status(trace.StatusCode.ERROR, f"Cannot move to {target_location}")
+                    return jsonify({
+                        "success": False,
+                        "message": f"Cannot move to {target_location}. Not connected to {self.location_id}"
+                    }), 400
+                
+                location_state = self._get_location_state(self.location_id)
+                if location_state["army"] <= 0:
+                    move_span.set_status(trace.StatusCode.ERROR, "No army to move")
+                    return jsonify({
+                        "success": False,
+                        "message": "No army to move"
+                    }), 400
+                
+                try:
+                    army_size = location_state["army"]
+                    current_faction = location_state["faction"]
+                    
+                    move_span.set_attribute("army_size", army_size)
+                    move_span.set_attribute("faction", current_faction)
+                    
+                    # Update the source location's army to 0
+                    self._update_location_state(self.location_id, army=0)
+                    
+                    # Force metric collection after army leaves the location
+                    self.telemetry.collect_metrics()
+                    
+                    result = self._continue_army_movement(
+                        army_size,
+                        current_faction,
+                        self.location_id,
+                        target_location,
+                        remaining_path,
+                        is_attack_move
+                    )
+                    
+                    if not result.get("success", True):
+                        move_span.set_status(trace.StatusCode.ERROR, result.get("message", "Unknown error"))
+                    
+                    return jsonify(result)
+                except Exception as e:
+                    move_span.record_exception(e)
+                    move_span.set_status(trace.StatusCode.ERROR, str(e))
+                    return jsonify({
+                        "success": False,
+                        "message": f"Failed to move army: {str(e)}"
+                    }), 500
         
         @self.app.route('/all_out_attack', methods=['POST'])
         def all_out_attack():
@@ -773,67 +800,80 @@ class LocationServer:
         
         @self.app.route('/send_resources_to_capital', methods=['POST'])
         def send_resources_to_capital():
+            # Extract trace context from request headers
+            context = extract(request.headers)
+            
             with self.tracer.start_as_current_span(
                 "send_resources_to_capital",
+                context=context,  # Use the extracted context
                 kind=SpanKind.SERVER,
                 attributes={
-                    "location": self.location_id,
+                    "service.name": self.location_info["name"],
                     "location_type": self.location_info["type"]
                 }
             ) as span:
-                location_state = self._get_location_state(self.location_id)
-                current_resources = location_state["resources"]
-                faction = location_state["faction"]
-                
-                span.set_attribute("resources_amount", current_resources)
-                span.set_attribute("faction", faction)
-                
-                if self.location_info["type"] != "village":
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, "Only villages can send resources"))
-                    self.logger.error(f"Only villages can send resources to capital")
+                try:
+                    location_state = self._get_location_state(self.location_id)
+                    current_resources = location_state["resources"]
+                    faction = location_state["faction"]
+                    
+                    span.set_attribute("resources_amount", current_resources)
+                    span.set_attribute("faction", faction)
+                    
+                    if self.location_info["type"] != "village":
+                        span.set_status(trace.StatusCode.ERROR, "Only villages can send resources")
+                        self.logger.error(f"Only villages can send resources to capital")
+                        return jsonify({
+                            "success": False,
+                            "message": "Only villages can send resources to capital"
+                        }), 403
+                    
+                    if faction not in ['southern', 'northern']:
+                        span.set_status(trace.StatusCode.ERROR, "Village must belong to a faction")
+                        self.logger.error(f"Village must belong to a faction to send resources")
+                        return jsonify({
+                            "success": False,
+                            "message": "Village must belong to a faction to send resources"
+                        }), 403
+                    
+                    # Determine target capital based on faction
+                    target_capital = "southern_capital" if faction == "southern" else "northern_capital"
+                    path = self._find_path(target_capital, PathType.RESOURCE)
+                    if not path:
+                        span.set_status(trace.StatusCode.ERROR, "No valid path to capital")
+                        self.logger.error(f"No valid path to capital found")
+                        return jsonify({
+                            "success": False,
+                            "message": "No valid path to capital found"
+                        }), 400
+                    
+                    span.set_attribute("path_to_capital", str(path))
+                    
+                    if self._transfer_resources_along_path(current_resources, path):
+                        self._start_resource_cooldown()
+                        self.logger.info(f"Resources sent to capital via {path}")
+                        # Force metric collection after initiating resource transfer
+                        self.telemetry.collect_metrics()
+                        return jsonify({
+                            "success": True,
+                            "message": f"Sending {current_resources} resources to capital via {' -> '.join(path)}",
+                            "path": path,
+                            "amount": current_resources
+                        })
+                    else:
+                        span.set_status(trace.StatusCode.ERROR, "Failed to start resource transfer")
+                        self.logger.error(f"Failed to start resource transfer")
+                        return jsonify({
+                            "success": False,
+                            "message": "Failed to start resource transfer"
+                        }), 500
+                except Exception as e:
+                    span.record_exception(e)
+                    span.set_status(trace.StatusCode.ERROR, str(e))
+                    self.logger.error(f"Error in send_resources_to_capital: {str(e)}")
                     return jsonify({
                         "success": False,
-                        "message": "Only villages can send resources to capital"
-                    }), 403
-                
-                if faction not in ['southern', 'northern']:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, "Village must belong to a faction"))
-                    self.logger.error(f"Village must belong to a faction to send resources")
-                    return jsonify({
-                        "success": False,
-                        "message": "Village must belong to a faction to send resources"
-                    }), 403
-                
-                # Determine target capital based on faction
-                target_capital = "southern_capital" if faction == "southern" else "northern_capital"
-                path = self._find_path(target_capital, PathType.RESOURCE)
-                if not path:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, "No valid path to capital"))
-                    self.logger.error(f"No valid path to capital found")
-                    return jsonify({
-                        "success": False,
-                        "message": "No valid path to capital found"
-                    }), 400
-                
-                span.set_attribute("path_to_capital", str(path))
-                
-                if self._transfer_resources_along_path(current_resources, path):
-                    self._start_resource_cooldown()
-                    self.logger.info(f"Resources sent to capital via {path}")
-                    # Force metric collection after initiating resource transfer
-                    self.telemetry.collect_metrics()
-                    return jsonify({
-                        "success": True,
-                        "message": f"Sending {current_resources} resources to capital via {' -> '.join(path)}",
-                        "path": path,
-                        "amount": current_resources
-                    })
-                else:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, "Failed to start resource transfer"))
-                    self.logger.error(f"Failed to start resource transfer")
-                    return jsonify({
-                        "success": False,
-                        "message": "Failed to start resource transfer"
+                        "message": f"Error: {str(e)}"
                     }), 500
         
         @self.app.route('/receive_resources', methods=['POST'])

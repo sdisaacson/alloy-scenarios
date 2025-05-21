@@ -11,6 +11,11 @@ from opentelemetry.propagate import inject
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'war_of_westeros_secret_key')
 
+@app.after_request
+def remove_frame_options(response):
+    response.headers.pop('X-Frame-Options', None)
+    return response
+
 # Configuration
 DATABASE_FILE = os.environ.get('DATABASE_FILE', '../app/game_state.db')
 API_BASE_URL = os.environ.get('API_BASE_URL', 'http://localhost')  # Base URL for API calls

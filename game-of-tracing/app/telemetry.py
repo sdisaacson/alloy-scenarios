@@ -31,8 +31,7 @@ class GameTelemetry:
         self.tracing_endpoint = tracing_endpoint
         self.metrics_endpoint = metrics_endpoint
         self.resource = Resource.create(attributes={
-            SERVICE_NAME: service_name,
-            "service.instance.id": "instance-1"
+            SERVICE_NAME: service_name
         })
         
         self._setup_logging()
