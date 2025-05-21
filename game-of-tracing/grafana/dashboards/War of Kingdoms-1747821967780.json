@@ -265,8 +265,8 @@
                     "kind": "prometheus",
                     "spec": {
                       "disableTextWrap": false,
-                      "editorMode": "builder",
-                      "expr": "game_army_size_ratio{location=\"$villages\"}",
+                      "editorMode": "code",
+                      "expr": "sum(game_army_size_ratio{job=\"$villages\"}) without (faction)",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -288,43 +288,33 @@
         "links": [],
         "title": "Current Army",
         "vizConfig": {
-          "kind": "gauge",
+          "kind": "stat",
           "spec": {
             "fieldConfig": {
               "defaults": {
-                "color": {
-                  "mode": "thresholds"
-                },
                 "mappings": [],
-                "max": 10,
-                "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "dark-red"
+                      "color": "green"
                     },
                     {
                       "color": "red",
-                      "value": 3
-                    },
-                    {
-                      "color": "#EAB839",
-                      "value": 5
-                    },
-                    {
-                      "color": "dark-green",
-                      "value": 15
+                      "value": 80
                     }
                   ]
-                }
+                },
+                "unit": "short"
               },
               "overrides": []
             },
             "options": {
-              "minVizHeight": 75,
-              "minVizWidth": 75,
+              "colorMode": "background",
+              "graphMode": "none",
+              "justifyMode": "auto",
               "orientation": "auto",
+              "percentChangeColorMode": "standard",
               "reduceOptions": {
                 "calcs": [
                   "lastNotNull"
@@ -332,9 +322,9 @@
                 "fields": "",
                 "values": false
               },
-              "showThresholdLabels": false,
-              "showThresholdMarkers": true,
-              "sizing": "auto"
+              "showPercentChange": false,
+              "textMode": "auto",
+              "wideLayout": true
             },
             "pluginVersion": "12.0.0"
           }
@@ -357,7 +347,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_resources_ratio{location=\"$villages\"}",
+                      "expr": "game_resources_ratio{job=\"$villages\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -447,8 +437,8 @@
                     "kind": "prometheus",
                     "spec": {
                       "disableTextWrap": false,
-                      "editorMode": "builder",
-                      "expr": "game_location_control_ratio{location=\"$villages\"}",
+                      "editorMode": "code",
+                      "expr": "sum(game_location_control_ratio{job=\"$villages\"}) without (faction)",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -544,7 +534,7 @@
                     "spec": {
                       "direction": "backward",
                       "editorMode": "code",
-                      "expr": "{service_name=\"$village\"} | code_function_name != \"_log\"",
+                      "expr": "{service_name=\"$villages\"} | code_function_name !=\"_log\"",
                       "queryType": "range"
                     }
                   },
@@ -696,12 +686,12 @@
                   },
                   "inspect": false
                 },
-                "mappings": [],
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "green"
+                      "color": "green",
+                      "value": 0
                     },
                     {
                       "color": "red",
@@ -729,6 +719,213 @@
         }
       }
     },
+    "panel-18": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "kind": "prometheus",
+                    "spec": {
+                      "disableTextWrap": false,
+                      "editorMode": "builder",
+                      "expr": "game_army_size_ratio{location=\"southern_capital\"}",
+                      "fullMetaSearch": false,
+                      "includeNullMetadata": true,
+                      "instant": false,
+                      "legendFormat": "__auto",
+                      "range": true,
+                      "useBackend": false
+                    }
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "",
+        "id": 18,
+        "links": [],
+        "title": "Current Army",
+        "vizConfig": {
+          "kind": "gauge",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "max": 10,
+                "min": 0,
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "dark-red",
+                      "value": 0
+                    },
+                    {
+                      "color": "red",
+                      "value": 3
+                    },
+                    {
+                      "color": "#EAB839",
+                      "value": 5
+                    },
+                    {
+                      "color": "dark-green",
+                      "value": 15
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "minVizHeight": 75,
+              "minVizWidth": 75,
+              "orientation": "auto",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "showThresholdLabels": false,
+              "showThresholdMarkers": true,
+              "sizing": "auto"
+            },
+            "pluginVersion": "12.0.0"
+          }
+        }
+      }
+    },
+    "panel-19": {
+      "kind": "Panel",
+      "spec": {
+        "data": {
+          "kind": "QueryGroup",
+          "spec": {
+            "queries": [
+              {
+                "kind": "PanelQuery",
+                "spec": {
+                  "hidden": false,
+                  "query": {
+                    "kind": "prometheus",
+                    "spec": {
+                      "disableTextWrap": false,
+                      "editorMode": "builder",
+                      "exemplar": true,
+                      "expr": "game_battles_total",
+                      "fullMetaSearch": false,
+                      "includeNullMetadata": true,
+                      "instant": false,
+                      "legendFormat": "__auto",
+                      "range": true,
+                      "useBackend": false
+                    }
+                  },
+                  "refId": "A"
+                }
+              }
+            ],
+            "queryOptions": {},
+            "transformations": []
+          }
+        },
+        "description": "",
+        "id": 19,
+        "links": [],
+        "title": "Battles",
+        "vizConfig": {
+          "kind": "timeseries",
+          "spec": {
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 17,
+                  "gradientMode": "none",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "linear",
+                  "lineStyle": {
+                    "fill": "solid"
+                  },
+                  "lineWidth": 1,
+                  "pointSize": 1,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green"
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "options": {
+              "legend": {
+                "calcs": [],
+                "displayMode": "list",
+                "placement": "bottom",
+                "showLegend": false
+              },
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
+            },
+            "pluginVersion": "12.0.0"
+          }
+        }
+      }
+    },
     "panel-2": {
       "kind": "Panel",
       "spec": {
@@ -745,6 +942,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "code",
+                      "exemplar": true,
                       "expr": "sum by (faction) (game_army_size_ratio)",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
@@ -783,7 +981,7 @@
                   "barAlignment": 0,
                   "barWidthFactor": 0.6,
                   "drawStyle": "line",
-                  "fillOpacity": 0,
+                  "fillOpacity": 29,
                   "gradientMode": "none",
                   "hideFrom": {
                     "legend": false,
@@ -857,6 +1055,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "code",
+                      "exemplar": true,
                       "expr": "game_resources_ratio{location_type=\"capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
@@ -884,7 +1083,7 @@
             "fieldConfig": {
               "defaults": {
                 "color": {
-                  "mode": "palette-classic"
+                  "mode": "palette-classic-by-name"
                 },
                 "custom": {
                   "axisBorderShow": false,
@@ -895,7 +1094,7 @@
                   "barAlignment": 0,
                   "barWidthFactor": 0.6,
                   "drawStyle": "line",
-                  "fillOpacity": 0,
+                  "fillOpacity": 26,
                   "gradientMode": "none",
                   "hideFrom": {
                     "legend": false,
@@ -1024,6 +1223,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
+                      "exemplar": true,
                       "expr": "game_army_size_ratio{location=\"southern_capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
@@ -1046,33 +1246,57 @@
         "links": [],
         "title": "Current Army",
         "vizConfig": {
-          "kind": "gauge",
+          "kind": "timeseries",
           "spec": {
             "fieldConfig": {
               "defaults": {
                 "color": {
-                  "mode": "thresholds"
+                  "fixedColor": "dark-red",
+                  "mode": "fixed"
                 },
-                "max": 10,
-                "min": 0,
+                "custom": {
+                  "axisBorderShow": false,
+                  "axisCenteredZero": false,
+                  "axisColorMode": "text",
+                  "axisLabel": "",
+                  "axisPlacement": "auto",
+                  "barAlignment": 0,
+                  "barWidthFactor": 0.6,
+                  "drawStyle": "line",
+                  "fillOpacity": 20,
+                  "gradientMode": "scheme",
+                  "hideFrom": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": false
+                  },
+                  "insertNulls": false,
+                  "lineInterpolation": "smooth",
+                  "lineWidth": 3,
+                  "pointSize": 5,
+                  "scaleDistribution": {
+                    "type": "linear"
+                  },
+                  "showPoints": "auto",
+                  "spanNulls": false,
+                  "stacking": {
+                    "group": "A",
+                    "mode": "none"
+                  },
+                  "thresholdsStyle": {
+                    "mode": "off"
+                  }
+                },
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "dark-red",
+                      "color": "green",
                       "value": 0
                     },
                     {
                       "color": "red",
-                      "value": 3
-                    },
-                    {
-                      "color": "#EAB839",
-                      "value": 5
-                    },
-                    {
-                      "color": "dark-green",
-                      "value": 15
+                      "value": 80
                     }
                   ]
                 }
@@ -1080,19 +1304,17 @@
               "overrides": []
             },
             "options": {
-              "minVizHeight": 75,
-              "minVizWidth": 75,
-              "orientation": "auto",
-              "reduceOptions": {
-                "calcs": [
-                  "lastNotNull"
-                ],
-                "fields": "",
-                "values": false
+              "legend": {
+                "calcs": [],
+                "displayMode": "hidden",
+                "placement": "right",
+                "showLegend": false
               },
-              "showThresholdLabels": false,
-              "showThresholdMarkers": true,
-              "sizing": "auto"
+              "tooltip": {
+                "hideZeros": false,
+                "mode": "single",
+                "sort": "none"
+              }
             },
             "pluginVersion": "12.0.0"
           }
@@ -1493,12 +1715,25 @@
                               "spec": {
                                 "element": {
                                   "kind": "ElementReference",
+                                  "name": "panel-19"
+                                },
+                                "height": 7,
+                                "width": 24,
+                                "x": 0,
+                                "y": 0
+                              }
+                            },
+                            {
+                              "kind": "GridLayoutItem",
+                              "spec": {
+                                "element": {
+                                  "kind": "ElementReference",
                                   "name": "panel-1"
                                 },
                                 "height": 11,
                                 "width": 24,
                                 "x": 0,
-                                "y": 0
+                                "y": 7
                               }
                             },
                             {
@@ -1511,7 +1746,7 @@
                                 "height": 6,
                                 "width": 12,
                                 "x": 0,
-                                "y": 11
+                                "y": 18
                               }
                             },
                             {
@@ -1524,7 +1759,7 @@
                                 "height": 6,
                                 "width": 12,
                                 "x": 12,
-                                "y": 11
+                                "y": 18
                               }
                             }
                           ]
@@ -1591,7 +1826,7 @@
                     "spec": {
                       "element": {
                         "kind": "ElementReference",
-                        "name": "panel-5"
+                        "name": "panel-18"
                       },
                       "height": 6,
                       "width": 9,
@@ -1636,6 +1871,19 @@
                       "width": 24,
                       "x": 0,
                       "y": 6
+                    }
+                  },
+                  {
+                    "kind": "GridLayoutItem",
+                    "spec": {
+                      "element": {
+                        "kind": "ElementReference",
+                        "name": "panel-5"
+                      },
+                      "height": 6,
+                      "width": 24,
+                      "x": 0,
+                      "y": 16
                     }
                   }
                 ]
@@ -1782,7 +2030,7 @@
   "preload": false,
   "tags": [],
   "timeSettings": {
-    "autoRefresh": "10s",
+    "autoRefresh": "",
     "autoRefreshIntervals": [
       "5s",
       "10s",
@@ -1796,7 +2044,7 @@
       "1d"
     ],
     "fiscalYearStartMonth": 0,
-    "from": "now-15m",
+    "from": "now-30m",
     "hideTimepicker": false,
     "timezone": "browser",
     "to": "now"
@@ -1810,7 +2058,7 @@
           "text": "",
           "value": ""
         },
-        "definition": "label_values(game_resources_ratio,location)",
+        "definition": "label_values(game_resources_ratio,job)",
         "hide": "dontHide",
         "includeAll": false,
         "label": "Villages",
@@ -1821,7 +2069,7 @@
           "kind": "prometheus",
           "spec": {
             "qryType": 1,
-            "query": "label_values(game_resources_ratio,location)",
+            "query": "label_values(game_resources_ratio,job)",
             "refId": "PrometheusVariableQueryEditor-VariableQuery"
           }
         },

@@ -74,6 +74,32 @@ The application consists of:
    - Prometheus: http://localhost:9090
    - Alloy Debug: http://localhost:12345/debug/livedebugging
 
+## Setting Up the Dashboard
+
+1. Log into Grafana at http://localhost:3000 (default credentials: admin/admin)
+
+2. Import the dashboard:
+   - Click the "+" icon in the left sidebar
+   - Select "Import dashboard"
+   - Click "Upload JSON file"
+   - Navigate to `grafana/dashboards/War of Kingdoms-1747821967780.json`
+   - Click "Import"
+
+3. Configure data sources:
+   - The dashboard requires Prometheus, Loki, and Tempo data sources
+   - These should be automatically configured if you're using the provided Docker setup
+   - If not, ensure the following URLs are set:
+     - Prometheus: http://prometheus:9090
+     - Loki: http://loki:3100
+     - Tempo: http://tempo:3200
+
+4. The dashboard provides:
+   - Real-time army and resource metrics
+   - Battle analytics
+   - Territory control visualization
+   - Service dependency mapping
+   - Trace analytics for game events
+
 ## Learning Through Play
 
 ### 1. Trace Context Propagation
