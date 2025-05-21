@@ -74,6 +74,14 @@ The application consists of:
    - Prometheus: http://localhost:9090
    - Alloy Debug: http://localhost:12345/debug/livedebugging
 
+5. Multiplayer Access:
+   - The game supports multiple players simultaneously
+   - Players can join using:
+     - `http://localhost:8080` from the same machine
+     - `http://<host-ip>:8080` from other machines on the network
+   - Each player can choose either the Southern or Northern faction
+   - The game prevents multiple players from selecting the same faction
+
 ## Setting Up the Dashboard
 
 1. Log into Grafana at http://localhost:3000 (default credentials: admin/admin)
