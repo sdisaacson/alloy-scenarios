@@ -1,5 +1,10 @@
 # War of Kingdoms: A Distributed Tracing Tutorial Game
 
+<div align="center">
+<img src="https://grafana.com/media/docs/alloy/game-of-tracing.jpeg" alt="Game of Tracing" width="200"/>
+</div>
+
+
 This educational game demonstrates distributed tracing concepts through an interactive strategy game built with OpenTelemetry and Grafana Alloy. Players learn about trace sampling, service graphs, and observability while competing for territory control.
 
 ## Educational Goals
