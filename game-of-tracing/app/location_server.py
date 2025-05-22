@@ -24,9 +24,10 @@ class LocationServer:
         self.resource_cooldown = {}
         self.lock = Lock()
         
-        # Initialize telemetry
-        location_name = os.environ.get('LOCATION_NAME', location_id)
-        self.telemetry = GameTelemetry(service_name=location_name)
+        # Initialize telemetry with consistent service name
+        # Always use hyphenated lowercase for service names
+        service_name = location_id.replace('_', '-')
+        self.telemetry = GameTelemetry(service_name=service_name)
         self.logger = self.telemetry.get_logger()
         self.tracer = self.telemetry.get_tracer()
         
@@ -519,7 +520,7 @@ class LocationServer:
                 context=context,
                 kind=SpanKind.SERVER,
                 attributes={
-                    "service.name": self.location_info["name"],
+                    "location_name": self.location_info["name"],
                     "location_type": self.location_info["type"]
                 }
             ) as move_span:
@@ -594,7 +595,7 @@ class LocationServer:
                 context=context,
                 kind=SpanKind.SERVER,
                 attributes={
-                    "service.name": self.location_info["name"],
+                    "location_name": self.location_info["name"],
                     "location_type": self.location_info["type"]
                 }
             ) as attack_span:
@@ -689,7 +690,7 @@ class LocationServer:
                     context=context,
                     kind=SpanKind.SERVER,
                     attributes={
-                        "service.name": self.location_info["name"],
+                        "location_name": self.location_info["name"],
                         "location_type": self.location_info["type"]
                     }
                 ) as battle_span:
@@ -808,7 +809,7 @@ class LocationServer:
                 context=context,  # Use the extracted context
                 kind=SpanKind.SERVER,
                 attributes={
-                    "service.name": self.location_info["name"],
+                    "location_name": self.location_info["name"],
                     "location_type": self.location_info["type"]
                 }
             ) as span:

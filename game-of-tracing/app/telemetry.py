@@ -165,7 +165,7 @@ class GameTelemetry:
                     yield Observation(
                         value=state["resources"],
                         attributes={
-                            "location": location_id,
+                            "location": self.service_name,
                             "location_type": LOCATIONS[location_id]["type"]
                         }
                     )
@@ -184,7 +184,7 @@ class GameTelemetry:
                     yield Observation(
                         value=state["army"],
                         attributes={
-                            "location": location_id,
+                            "location": self.service_name,
                             "location_type": LOCATIONS[location_id]["type"],
                             "faction": state["faction"]
                         }
@@ -205,7 +205,7 @@ class GameTelemetry:
                     self.logger.debug(f"Observing cooldown for {location_id}: {cooldown_value}s")
                     yield Observation(
                         value=cooldown_value,
-                        attributes={"location": location_id}
+                        attributes={"location": self.service_name}
                     )
                 else:
                     yield Observation(value=0, attributes={"location": location_id})
@@ -231,7 +231,7 @@ class GameTelemetry:
                     yield Observation(
                         value=faction_value,
                         attributes={
-                            "location": location_id,
+                            "location": self.service_name,
                             "location_type": LOCATIONS[location_id]["type"],
                             "faction": state["faction"]
                         }

@@ -115,7 +115,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_location_control_ratio{location=\"northern_capital\"}",
+                      "expr": "game_location_control_ratio{location=\"northern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -144,14 +144,14 @@
                 "color": {
                   "mode": "thresholds"
                 },
+                "mappings": [],
                 "max": 2,
                 "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "#370a4d",
-                      "value": 0
+                      "color": "#370a4d"
                     },
                     {
                       "color": "super-light-blue",
@@ -686,12 +686,12 @@
                   },
                   "inspect": false
                 },
+                "mappings": [],
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "green",
-                      "value": 0
+                      "color": "green"
                     },
                     {
                       "color": "red",
@@ -735,7 +735,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_army_size_ratio{location=\"southern_capital\"}",
+                      "expr": "game_army_size_ratio{location=\"southern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -764,14 +764,14 @@
                 "color": {
                   "mode": "thresholds"
                 },
+                "mappings": [],
                 "max": 10,
                 "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "dark-red",
-                      "value": 0
+                      "color": "dark-red"
                     },
                     {
                       "color": "red",
@@ -1224,7 +1224,7 @@
                       "disableTextWrap": false,
                       "editorMode": "builder",
                       "exemplar": true,
-                      "expr": "game_army_size_ratio{location=\"southern_capital\"}",
+                      "expr": "game_army_size_ratio{location=\"southern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -1287,12 +1287,12 @@
                     "mode": "off"
                   }
                 },
+                "mappings": [],
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "green",
-                      "value": 0
+                      "color": "green"
                     },
                     {
                       "color": "red",
@@ -1337,7 +1337,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_resources_ratio{location=\"southern_capital\"}",
+                      "expr": "game_resources_ratio{location=\"southern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -1366,14 +1366,14 @@
                 "color": {
                   "mode": "thresholds"
                 },
+                "mappings": [],
                 "max": 200,
                 "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "dark-red",
-                      "value": 0
+                      "color": "dark-red"
                     },
                     {
                       "color": "red",
@@ -1428,7 +1428,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_location_control_ratio{location=\"southern_capital\"}",
+                      "expr": "game_location_control_ratio{location=\"southern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -1457,14 +1457,14 @@
                 "color": {
                   "mode": "thresholds"
                 },
+                "mappings": [],
                 "max": 2,
                 "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "#370a4d",
-                      "value": 0
+                      "color": "#370a4d"
                     },
                     {
                       "color": "super-light-blue",
@@ -1524,7 +1524,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_army_size_ratio{location=\"northern_capital\"}",
+                      "expr": "game_army_size_ratio{location=\"northern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -1553,14 +1553,14 @@
                 "color": {
                   "mode": "thresholds"
                 },
+                "mappings": [],
                 "max": 10,
                 "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "dark-red",
-                      "value": 0
+                      "color": "dark-red"
                     },
                     {
                       "color": "red",
@@ -1615,7 +1615,7 @@
                     "spec": {
                       "disableTextWrap": false,
                       "editorMode": "builder",
-                      "expr": "game_resources_ratio{location=\"northern_capital\"}",
+                      "expr": "game_resources_ratio{location=\"northern-capital\"}",
                       "fullMetaSearch": false,
                       "includeNullMetadata": true,
                       "instant": false,
@@ -1644,14 +1644,14 @@
                 "color": {
                   "mode": "thresholds"
                 },
+                "mappings": [],
                 "max": 200,
                 "min": 0,
                 "thresholds": {
                   "mode": "absolute",
                   "steps": [
                     {
-                      "color": "dark-red",
-                      "value": 0
+                      "color": "dark-red"
                     },
                     {
                       "color": "red",
