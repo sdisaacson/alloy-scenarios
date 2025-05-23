@@ -237,6 +237,8 @@ services:
       - DATABASE_FILE=/data/game_state.db
       - LOCATION_NAME=war-map
       - SECRET_KEY=war_of_westeros_secret_key
+      - IN_DOCKER=1
+      - AI_URL=http://ai-opponent:8081
     volumes:
       - game-data:/data
     depends_on:
@@ -248,6 +250,27 @@ services:
       - village-4
       - village-5
       - village-6
+      
+  # AI Opponent Service
+  ai-opponent:
+    build:
+      context: ./ai_opponent
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - IN_DOCKER=1
+      - LOCATION_NAME=ai-opponent
+    depends_on:
+      - southern-capital
+      - northern-capital
+      - village-1
+      - village-2
+      - village-3
+      - village-4
+      - village-5
+      - village-6
+      - alloy
 
 volumes:
   game-data: 

@@ -11,6 +11,9 @@ from opentelemetry.propagate import inject
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'war_of_westeros_secret_key')
 
+# AI Service configuration
+AI_SERVICE_URL = os.environ.get('AI_URL', 'http://localhost:8081')
+
 @app.after_request
 def remove_frame_options(response):
     response.headers.pop('X-Frame-Options', None)
@@ -504,6 +507,18 @@ def map_data():
 @app.route('/api/game_status', methods=['GET'])
 def game_status():
     """API endpoint to get the current game status"""
+    # Always check the current state to catch AI victories
+    locations_data = {}
+    for loc_id in LOCATION_POSITIONS.keys():
+        data = make_api_request(loc_id, '')
+        if 'error' not in data:
+            locations_data[loc_id] = {
+                'faction': data['faction']
+            }
+    
+    # Check for game over condition with fresh data
+    check_game_over(locations_data)
+    
     return jsonify({
         "game_over": GAME_OVER,
         "winner": WINNER,
@@ -600,6 +615,86 @@ def all_out_attack():
             span.record_exception(e)
             span.set_status(trace.StatusCode.ERROR, str(e))
             return jsonify({"success": False, "message": f"Failed to launch attack: {str(e)}"}), 500
+
+@app.route('/api/ai_toggle', methods=['POST'])
+def toggle_ai():
+    """Toggle AI opponent on/off"""
+    data = request.get_json()
+    enable_ai = data.get('enable', False)
+    
+    if enable_ai:
+        # Get player's faction to determine AI faction
+        player_faction = session.get('faction')
+        if not player_faction:
+            return jsonify({"success": False, "message": "No player faction selected"}), 400
+        
+        # AI takes the opposite faction
+        ai_faction = 'northern' if player_faction == 'southern' else 'southern'
+        
+        # Activate AI
+        try:
+            response = requests.post(
+                f"{AI_SERVICE_URL}/activate",
+                json={"faction": ai_faction},
+                timeout=5
+            )
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    logger.info(f"AI activated for {ai_faction} faction")
+                    return jsonify({
+                        "success": True,
+                        "message": f"AI opponent activated for {ai_faction} faction"
+                    })
+            
+            return jsonify({
+                "success": False,
+                "message": "Failed to activate AI"
+            }), 500
+            
+        except requests.RequestException as e:
+            logger.error(f"Error communicating with AI service: {e}")
+            return jsonify({
+                "success": False,
+                "message": "AI service unavailable"
+            }), 503
+    else:
+        # Deactivate AI
+        try:
+            response = requests.post(
+                f"{AI_SERVICE_URL}/deactivate",
+                timeout=5
+            )
+            if response.status_code == 200:
+                logger.info("AI deactivated")
+                return jsonify({
+                    "success": True,
+                    "message": "AI opponent deactivated"
+                })
+            
+            return jsonify({
+                "success": False,
+                "message": "Failed to deactivate AI"
+            }), 500
+            
+        except requests.RequestException as e:
+            logger.error(f"Error communicating with AI service: {e}")
+            return jsonify({
+                "success": False,
+                "message": "AI service unavailable"
+            }), 503
+
+@app.route('/api/ai_status', methods=['GET'])
+def get_ai_status():
+    """Get current AI status"""
+    try:
+        response = requests.get(f"{AI_SERVICE_URL}/status", timeout=5)
+        if response.status_code == 200:
+            return jsonify(response.json())
+        
+        return jsonify({"active": False, "faction": None})
+    except requests.RequestException:
+        return jsonify({"active": False, "faction": None})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

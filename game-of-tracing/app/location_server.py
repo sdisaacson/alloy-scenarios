@@ -707,8 +707,11 @@ class LocationServer:
                     battle_span.set_attribute("source_location", source_location)
                     battle_span.set_attribute("attacking_army", attacking_army)
                     battle_span.set_attribute("defending_army", defending_army)
+                    battle_span.set_attribute("remaining_path", str(remaining_path))
+                    battle_span.set_attribute("is_attack_move", is_attack_move)
 
                     self.logger.info(f"Received army at {self.location_id}: {data}")
+                    self.logger.info(f"Remaining path: {remaining_path}, is_attack_move: {is_attack_move}")
                     
                     if attacking_faction == defending_faction:
                         # For all-out attacks, combine armies with friendly villages
@@ -718,15 +721,20 @@ class LocationServer:
                             # Set village's army to 0
                             self._update_location_state(self.location_id, army=0)
                             battle_span.set_attribute("combined_army_size", attacking_army)
-                            self.logger.info(f"Combined armies at {self.location_id}: {attacking_army}")
+                            self.logger.info(f"Combined armies at {self.location_id}: {attacking_army} (village army was {defending_army})")
                         
+                        # Continue movement if there's a path remaining
                         if is_attack_move and remaining_path:
+                            next_location = remaining_path[0]
+                            new_remaining_path = remaining_path[1:] if len(remaining_path) > 1 else []
+                            self.logger.info(f"Continuing attack from {self.location_id} to {next_location}, new path: {new_remaining_path}")
+                            
                             result = self._continue_army_movement(
                                 attacking_army,  # Use the potentially increased army size
                                 attacking_faction,
                                 self.location_id,
-                                remaining_path[0],
-                                remaining_path[1:],
+                                next_location,
+                                new_remaining_path,
                                 is_attack_move
                             )
                             battle_span.set_attribute("result", "friendly_passage")
@@ -734,7 +742,8 @@ class LocationServer:
                             # Force metric collection after friendly passage
                             self.telemetry.collect_metrics()
                             return jsonify(result)
-                        else:
+                        elif not is_attack_move:
+                            # Normal army movement - combine armies
                             new_army = defending_army + attacking_army
                             self._update_location_state(self.location_id, army=new_army)
                             battle_span.set_attribute("result", "armies_combined")
@@ -745,6 +754,26 @@ class LocationServer:
                                 "success": True,
                                 "message": f"Armies combined at {self.location_info['name']}",
                                 "current_army": new_army,
+                                "faction": defending_faction
+                            })
+                        else:
+                            # All-out attack reached friendly location with no remaining path
+                            # This shouldn't normally happen, but handle it gracefully
+                            if self.location_info["type"] == "capital":
+                                # If it's our own capital, stop here
+                                self._update_location_state(self.location_id, army=attacking_army)
+                                battle_span.set_attribute("result", "returned_to_capital")
+                                self.logger.warning(f"All-out attack returned to own capital with {attacking_army} troops")
+                            else:
+                                # For villages, the army should already be zeroed out above
+                                battle_span.set_attribute("result", "attack_ended_at_village")
+                                self.logger.warning(f"All-out attack ended at friendly village {self.location_id}")
+                            
+                            self.telemetry.collect_metrics()
+                            return jsonify({
+                                "success": True,
+                                "message": f"Army movement ended at {self.location_info['name']}",
+                                "current_army": self._get_location_state(self.location_id)["army"],
                                 "faction": defending_faction
                             })
                     
@@ -766,12 +795,13 @@ class LocationServer:
                     
                     if battle_result == "attacker_victory" and is_attack_move and remaining_path:
                         self.logger.info(f"Continuing army movement at {self.location_id}: {remaining_army}")
+                        self.logger.info(f"Battle victory - continuing to {remaining_path[0]}, path: {remaining_path[1:]}")
                         result = self._continue_army_movement(
                             remaining_army,
                             attacking_faction,
                             self.location_id,
                             remaining_path[0],
-                            remaining_path[1:],
+                            remaining_path[1:] if len(remaining_path) > 1 else [],
                             is_attack_move
                         )
                         return jsonify(result)

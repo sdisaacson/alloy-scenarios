@@ -39,6 +39,8 @@ The game simulates a war between two kingdoms, each starting from their capital 
 - Send resources back to their capital
 - Launch strategic attacks on enemy territories
 
+The game supports both single-player (with AI opponent) and two-player modes.
+
 Each action in the game generates traces that can be analyzed in Grafana Tempo, demonstrating how distributed tracing works in a real application.
 
 ## Technical Components
@@ -47,6 +49,7 @@ The application consists of:
 
 - **Location Servers**: Python Flask microservices representing different map locations
 - **War Map UI**: Web interface for game interaction
+- **AI Opponent**: Intelligent computer player for single-player mode
 - **Telemetry Pipeline**:
   - OpenTelemetry SDK for instrumentation
   - Grafana Alloy for trace processing
@@ -86,6 +89,12 @@ The application consists of:
      - `http://<host-ip>:8080` from other machines on the network
    - Each player can choose either the Southern or Northern faction
    - The game prevents multiple players from selecting the same faction
+
+6. Single-Player Mode:
+   - Toggle "Enable AI Opponent" in the game interface
+   - The AI will automatically control the faction not chosen by the player
+   - The AI provides a balanced challenge with adaptive strategies
+   - For two-player games, keep the AI toggle disabled
 
 ## Setting Up the Dashboard
 

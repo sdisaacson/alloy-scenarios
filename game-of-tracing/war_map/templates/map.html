@@ -61,6 +61,24 @@
     
     <!-- Right Panel - Location Info & Actions -->
     <div class="col-md-3">
+        <!-- AI Opponent Control -->
+        <div class="card shadow mb-3">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">AI Opponent</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="aiToggle" role="switch">
+                    <label class="form-check-label" for="aiToggle">
+                        Enable AI Opponent
+                    </label>
+                </div>
+                <div id="aiStatus" class="mt-2 small text-muted">
+                    AI is inactive
+                </div>
+            </div>
+        </div>
+        
         <div class="card shadow mb-4">
             <div class="card-header bg-dark text-white">
                 <h5 class="mb-0" id="locationName">Select a Location</h5>
@@ -745,7 +763,7 @@
                 
                 // Start periodic updates to show army movement
                 let updateCount = 0;
-                const maxUpdates = 4; // Update 4 times during movement
+                const maxUpdates = 6; // Increase from 4 to 6 for longer monitoring
                 
                 const updateInterval = setInterval(() => {
                     refreshMapData();
@@ -753,6 +771,8 @@
                     
                     if (updateCount >= maxUpdates) {
                         clearInterval(updateInterval);
+                        // Final check for game over after movement completes
+                        setTimeout(checkGameStatus, 1000);
                     }
                 }, 2500); // Update every 2.5 seconds
                 
@@ -876,6 +896,9 @@
         
         // Set up auto-refresh every 30 seconds
         setInterval(refreshMapData, 30000);
+        
+        // Set up more frequent game status checks
+        setInterval(checkGameStatus, 5000); // Check every 5 seconds for game over
 
         // Add Send Resources button handler
         document.getElementById('sendResourcesBtn').addEventListener('click', () => {
@@ -895,6 +918,72 @@
             
             launchAllOutAttack(gameState.selectedLocation);
         });
+
+        // AI Toggle functionality
+        const aiToggle = document.getElementById('aiToggle');
+        const aiStatus = document.getElementById('aiStatus');
+        
+        // Check AI status on load
+        checkAIStatus();
+        
+        // Handle AI toggle
+        aiToggle.addEventListener('change', async function() {
+            const enable = this.checked;
+            
+            try {
+                const response = await fetch('/api/ai_toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enable: enable })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (enable) {
+                        aiStatus.textContent = 'AI is active - ' + result.message;
+                        aiStatus.classList.remove('text-muted');
+                        aiStatus.classList.add('text-success');
+                    } else {
+                        aiStatus.textContent = 'AI is inactive';
+                        aiStatus.classList.remove('text-success');
+                        aiStatus.classList.add('text-muted');
+                    }
+                } else {
+                    // Revert toggle on failure
+                    this.checked = !enable;
+                    alert('Failed to toggle AI: ' + result.message);
+                }
+            } catch (error) {
+                // Revert toggle on error
+                this.checked = !enable;
+                alert('Failed to connect to AI service');
+            }
+        });
+        
+        // Check AI status periodically
+        setInterval(checkAIStatus, 10000);
+        
+        async function checkAIStatus() {
+            try {
+                const response = await fetch('/api/ai_status');
+                const status = await response.json();
+                
+                if (status.active) {
+                    aiToggle.checked = true;
+                    aiStatus.textContent = `AI is active (${status.faction} faction)`;
+                    aiStatus.classList.remove('text-muted');
+                    aiStatus.classList.add('text-success');
+                } else {
+                    aiToggle.checked = false;
+                    aiStatus.textContent = 'AI is inactive';
+                    aiStatus.classList.remove('text-success');
+                    aiStatus.classList.add('text-muted');
+                }
+            } catch (error) {
+                console.error('Failed to check AI status:', error);
+            }
+        }
     });
 
     // Update function to create and position a transfer indicator
@@ -1064,7 +1153,7 @@
                 
                 // Start periodic updates to show army movement
                 let updateCount = 0;
-                const maxUpdates = result.path.length * 2;
+                const maxUpdates = result.path.length * 3; // More updates for all-out attacks
                 
                 const updateInterval = setInterval(() => {
                     refreshMapData();
@@ -1072,13 +1161,46 @@
                     
                     if (updateCount >= maxUpdates) {
                         clearInterval(updateInterval);
+                        // Final check for game over after attack completes
+                        setTimeout(checkGameStatus, 1000);
                     }
-                }, 2500);
+                }, 2000); // Update every 2 seconds for all-out attacks
+                
+                // Also check if the result indicates game over
+                if (result.game_over) {
+                    gameState.gameOver = true;
+                    gameState.winner = result.winner;
+                    gameState.victoryMessage = result.victory_message;
+                    checkGameOver();
+                }
             } else {
                 showActionStatus('danger', result.message || 'Failed to launch attack');
             }
         } catch (error) {
             showActionStatus('danger', 'Failed to launch attack. Check console for details.');
+        }
+    }
+
+    // Add new function to check game status
+    async function checkGameStatus() {
+        try {
+            const response = await fetch('/api/game_status');
+            const status = await response.json();
+            
+            if (status.game_over && !gameState.gameOver) {
+                // Game just ended - update immediately
+                gameState.gameOver = true;
+                gameState.winner = status.winner;
+                gameState.victoryMessage = status.victory_message;
+                
+                // Refresh the full map data to ensure consistency
+                await refreshMapData();
+                
+                // Check game over to show the overlay
+                checkGameOver();
+            }
+        } catch (error) {
+            console.error('Error checking game status:', error);
         }
     }
 </script>
