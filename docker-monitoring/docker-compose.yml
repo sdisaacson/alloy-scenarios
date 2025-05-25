@@ -53,7 +53,7 @@ services:
   alloy:
    image: grafana/alloy:${GRAFANA_ALLOY_VERSION:-v1.8.2}
    ports:
-     - 12345:12345
+     - 38562:12345
      - 4317:4317
      - 4318:4318
    volumes:
